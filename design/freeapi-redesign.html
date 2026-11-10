@@ -1,0 +1,1337 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>FreeAPI · 多后端控制台 · 设计稿</title>
+<style>
+/* ---------- tokens ---------- */
+:root {
+  color-scheme: light;
+  --font-ui: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "PingFang SC", "Helvetica Neue", sans-serif;
+  --font-mono: ui-monospace, "SF Mono", "SFMono-Regular", Menlo, monospace;
+
+  --ink: #1f1e1d;
+  --ink-2: #5d584f;
+  --ink-3: #8d8578;
+  --accent: #b85c38;
+  --accent-2: #d97757;
+  --ok: #4f8a63;
+  --ok-ink: #37694a;
+  --warn: #b57b22;
+  --warn-ink: #8a5a12;
+  --bad: #b8483a;
+  --bad-ink: #943329;
+
+  --hairline: rgba(31, 30, 29, .08);
+  --hairline-strong: rgba(31, 30, 29, .14);
+
+  --glass-fill: rgba(253, 250, 244, .66);
+  --glass-fill-2: rgba(251, 247, 239, .42);
+  --glass-stroke: rgba(255, 252, 245, .72);
+  --glass-stroke-2: rgba(255, 252, 245, .46);
+
+  --well: rgba(250, 245, 235, .46);
+  --input-bg: rgba(255, 252, 246, .62);
+  --row-hover: rgba(255, 250, 241, .46);
+  --row-sel: rgba(255, 252, 245, .78);
+  --seg-bg: rgba(122, 110, 92, .14);
+  --seg-thumb: rgba(255, 252, 245, .95);
+  --code-bg: rgba(72, 55, 38, .06);
+
+  --shadow-window: 0 44px 110px -34px rgba(72, 46, 28, .5), 0 10px 28px -12px rgba(72, 46, 28, .2);
+  --shadow-pop: 0 30px 70px -24px rgba(72, 46, 28, .46), 0 6px 18px -8px rgba(72, 46, 28, .18);
+
+  --r-window: 26px;
+  --r-panel: 16px;
+  --r-well: 13px;
+  --r-control: 9px;
+}
+
+[data-theme="dark"] {
+  color-scheme: dark;
+  --ink: #f5f1e8;
+  --ink-2: #c2b9aa;
+  --ink-3: #8e8477;
+  --accent: #e29170;
+  --accent-2: #f0a184;
+  --ok: #7fc08f;
+  --ok-ink: #a6d9b4;
+  --warn: #e6b25c;
+  --warn-ink: #f0ce93;
+  --bad: #e07868;
+  --bad-ink: #f0a79d;
+
+  --hairline: rgba(255, 246, 232, .09);
+  --hairline-strong: rgba(255, 246, 232, .17);
+
+  --glass-fill: rgba(37, 34, 30, .68);
+  --glass-fill-2: rgba(37, 34, 30, .46);
+  --glass-stroke: rgba(255, 246, 232, .15);
+  --glass-stroke-2: rgba(255, 246, 232, .09);
+
+  --well: rgba(255, 246, 232, .045);
+  --input-bg: rgba(255, 246, 232, .07);
+  --row-hover: rgba(255, 246, 232, .06);
+  --row-sel: rgba(255, 246, 232, .12);
+  --seg-bg: rgba(255, 246, 232, .08);
+  --seg-thumb: rgba(255, 246, 232, .19);
+  --code-bg: rgba(0, 0, 0, .26);
+
+  --shadow-window: 0 50px 120px -30px rgba(0, 0, 0, .78), 0 10px 30px -10px rgba(0, 0, 0, .52);
+  --shadow-pop: 0 34px 80px -22px rgba(0, 0, 0, .72), 0 8px 20px -8px rgba(0, 0, 0, .48);
+}
+
+* { box-sizing: border-box; }
+html, body { height: 100%; }
+body {
+  margin: 0;
+  font-family: var(--font-ui);
+  color: var(--ink);
+  background: #f6f1e7;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  overflow-x: hidden;
+}
+button, input, select { font: inherit; color: inherit; }
+button { cursor: pointer; }
+:focus-visible { outline: 2px solid color-mix(in srgb, var(--accent) 70%, white); outline-offset: 2px; }
+::selection { background: color-mix(in srgb, var(--accent) 24%, transparent); }
+
+.mono { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+
+.i { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+.i.sm { width: 13px; height: 13px; }
+.i.lg { width: 18px; height: 18px; }
+
+/* ---------- backdrop ---------- */
+.aurora { position: fixed; inset: 0; z-index: 0; overflow: hidden; background: linear-gradient(175deg, #fcfaf5 0%, #f7f2e8 48%, #f2ebde 100%); }
+.aurora .blob { position: absolute; border-radius: 50%; filter: blur(92px); opacity: .62; }
+.aurora .b1 { width: 760px; height: 760px; left: -210px; top: -280px; background: #f1cfb0; opacity: .55; }
+.aurora .b2 { width: 660px; height: 660px; right: -160px; top: -220px; background: #e6c0ae; opacity: .38; }
+.aurora .b3 { width: 820px; height: 820px; right: -180px; bottom: -430px; background: #d9d0b2; opacity: .4; }
+.aurora .b4 { width: 560px; height: 560px; left: -180px; bottom: -260px; background: #c3d2b8; opacity: .32; }
+.aurora .grain {
+  position: absolute; inset: 0; opacity: .055; mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.86' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+[data-theme="dark"] .aurora { background: linear-gradient(175deg, #1c1a17 0%, #191713 55%, #12100e 100%); }
+[data-theme="dark"] .aurora .b1 { background: #6b3a25; opacity: .55; }
+[data-theme="dark"] .aurora .b2 { background: #4a2b24; opacity: .5; }
+[data-theme="dark"] .aurora .b3 { background: #3f3a24; opacity: .42; }
+[data-theme="dark"] .aurora .b4 { background: #2b3a2c; opacity: .36; }
+[data-theme="dark"] .aurora .grain { opacity: .09; }
+
+/* ---------- demo chrome ---------- */
+.demo-bar {
+  position: relative; z-index: 6;
+  display: flex; align-items: center; justify-content: space-between; gap: 18px;
+  padding: 12px 22px;
+  border-bottom: 1px solid var(--hairline);
+  background: color-mix(in srgb, var(--glass-fill) 55%, transparent);
+  backdrop-filter: blur(22px) saturate(160%);
+}
+.demo-title { display: flex; align-items: center; gap: 10px; font-size: 12px; font-weight: 600; color: var(--ink-2); letter-spacing: .01em; }
+.demo-title .mark {
+  width: 22px; height: 22px; border-radius: 7px; display: grid; place-items: center;
+  color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 16%, transparent);
+}
+.demo-title .ver { font-size: 10.5px; font-weight: 500; color: var(--ink-3); padding: 2px 7px; border-radius: 999px; border: 1px solid var(--hairline-strong); }
+.demo-actions { display: flex; align-items: center; gap: 10px; }
+.demo-hint { font-size: 11px; color: var(--ink-3); }
+
+.icon-btn {
+  width: 30px; height: 30px; display: inline-grid; place-items: center;
+  border-radius: 9px; border: 1px solid var(--glass-stroke-2);
+  background: var(--input-bg); color: var(--ink-2);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .5);
+}
+.icon-btn:hover { color: var(--ink); background: color-mix(in srgb, var(--input-bg) 70%, white); }
+
+/* ---------- segmented ---------- */
+.seg {
+  display: inline-flex; padding: 2px; gap: 2px; border-radius: 10px;
+  background: var(--seg-bg); box-shadow: inset 0 1px 2px rgba(72, 55, 38, .08);
+}
+.seg button {
+  border: 0; background: transparent; color: var(--ink-2);
+  font-size: 11.5px; font-weight: 600; letter-spacing: .005em;
+  padding: 5px 12px; border-radius: 8px; transition: background .18s ease, color .18s ease, box-shadow .18s ease;
+}
+.seg button:hover { color: var(--ink); }
+.seg button.on {
+  color: var(--ink); background: var(--seg-thumb);
+  box-shadow: 0 1px 2px rgba(72, 55, 38, .12), 0 0 0 .5px rgba(72, 55, 38, .06);
+}
+.seg.tiny button { font-size: 10.5px; padding: 3px 8px; border-radius: 7px; }
+
+/* ---------- switches ---------- */
+.switch { position: relative; width: 38px; height: 22px; flex: none; border: 0; background: transparent; padding: 0; border-radius: 999px; }
+.switch .track {
+  position: absolute; inset: 0; border-radius: 999px;
+  background: rgba(116, 136, 166, .35);
+  box-shadow: inset 0 1px 2px rgba(72, 50, 30, .16);
+  transition: background .22s ease;
+}
+.switch .thumb {
+  position: absolute; top: 2px; left: 2px; width: 18px; height: 18px; border-radius: 50%;
+  background: #fffdf8; box-shadow: 0 1px 3px rgba(72, 50, 30, .28), 0 0 0 .5px rgba(72, 50, 30, .06);
+  transition: transform .22s cubic-bezier(.2, .8, .3, 1);
+}
+.switch.on .track { background: linear-gradient(180deg, #6fae7e, var(--ok)); }
+.switch.on .thumb { transform: translateX(16px); }
+.switch.sm { width: 32px; height: 18px; }
+.switch.sm .thumb { width: 14px; height: 14px; }
+.switch.sm.on .thumb { transform: translateX(14px); }
+[data-theme="dark"] .switch .track { background: rgba(255, 255, 255, .18); }
+[data-theme="dark"] .switch.on .track { background: linear-gradient(180deg, #8fd3a1, #4f8a63); }
+
+/* ---------- dots / chips / tags ---------- */
+.dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; background: var(--ink-3); flex: none; }
+.dot.ok { background: var(--ok); box-shadow: 0 0 0 3px color-mix(in srgb, var(--ok) 18%, transparent); }
+.dot.warn { background: var(--warn); box-shadow: 0 0 0 3px color-mix(in srgb, var(--warn) 16%, transparent); animation: breathe 1.5s ease-in-out infinite; }
+.dot.err { background: var(--bad); box-shadow: 0 0 0 3px color-mix(in srgb, var(--bad) 17%, transparent); }
+.dot.off { background: color-mix(in srgb, var(--ink-3) 65%, transparent); box-shadow: none; }
+@keyframes breathe { 0%, 100% { opacity: 1; } 50% { opacity: .35; } }
+
+.chip {
+  display: inline-flex; align-items: center; gap: 5px;
+  height: 20px; padding: 0 8px; border-radius: 999px;
+  font-size: 10.5px; font-weight: 650; white-space: nowrap;
+}
+.chip .dot { width: 6px; height: 6px; box-shadow: none; }
+.chip.ok { color: var(--ok-ink); background: color-mix(in srgb, var(--ok) 13%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ok) 18%, transparent); }
+.chip.warn { color: var(--warn-ink); background: color-mix(in srgb, var(--warn) 13%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--warn) 18%, transparent); }
+.chip.err { color: var(--bad-ink); background: color-mix(in srgb, var(--bad) 12%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--bad) 18%, transparent); }
+.chip.off { color: var(--ink-3); background: color-mix(in srgb, var(--ink-3) 12%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ink-3) 14%, transparent); }
+
+.tag {
+  font-size: 9px; font-weight: 700; letter-spacing: .03em;
+  padding: 1.5px 5px; border-radius: 4.5px; line-height: 1.35; flex: none;
+}
+.tag.ssh { color: var(--accent); background: color-mix(in srgb, var(--accent) 11%, transparent); }
+.tag.direct { color: #6e665a; background: rgba(110, 102, 90, .12); }
+[data-theme="dark"] .tag.ssh { color: #efb49a; background: rgba(217, 119, 87, .18); }
+[data-theme="dark"] .tag.direct { color: #c7bda9; background: rgba(199, 189, 169, .14); }
+
+/* ---------- glass surfaces ---------- */
+.glass {
+  position: relative; isolation: isolate;
+  background: linear-gradient(155deg, var(--glass-fill), var(--glass-fill-2));
+  border: 1px solid var(--glass-stroke);
+  backdrop-filter: blur(44px) saturate(175%);
+  -webkit-backdrop-filter: blur(44px) saturate(175%);
+}
+.glass::before {
+  content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none; z-index: 0;
+  background:
+    radial-gradient(130% 70% at 16% -28%, rgba(255, 255, 255, .95), rgba(255, 255, 255, 0) 58%),
+    radial-gradient(90% 55% at 104% -12%, rgba(255, 255, 255, .45), rgba(255, 255, 255, 0) 55%),
+    linear-gradient(180deg, rgba(255, 255, 255, .22), rgba(255, 255, 255, 0) 26%);
+  opacity: .62;
+}
+[data-theme="dark"] .glass::before { opacity: .14; }
+.glass > * { position: relative; z-index: 1; }
+
+/* ---------- stage ---------- */
+.stage {
+  position: relative; z-index: 2;
+  display: flex; align-items: flex-start; justify-content: center; flex-wrap: wrap;
+  gap: 30px;
+  min-height: calc(100vh - 55px);
+  padding: 34px 28px 64px;
+}
+.view-main { width: 100%; display: flex; justify-content: center; }
+.view-popover { width: min(1060px, 100%); display: flex; flex-direction: column; align-items: flex-end; }
+body[data-view="main"] .view-popover,
+body[data-view="popover"] .view-main { display: none; }
+body[data-view="both"] .menubar { display: none; }
+body[data-view="both"] .view-popover { width: auto; padding-top: 6px; }
+
+/* ---------- app window ---------- */
+.app-window {
+  width: 1040px; height: 720px; flex: none;
+  display: grid; grid-template-columns: 300px 1fr;
+  border-radius: var(--r-window);
+  box-shadow: var(--shadow-window), inset 0 1px 0 rgba(255, 252, 245, .9), inset 0 0 0 1px rgba(255, 252, 245, .24);
+  overflow: hidden;
+  zoom: 1;
+}
+[data-theme="dark"] .app-window {
+  box-shadow: var(--shadow-window), inset 0 1px 0 rgba(255, 255, 255, .13), inset 0 0 0 1px rgba(255, 255, 255, .04);
+}
+
+.traffic { position: absolute; top: 17px; left: 19px; display: flex; gap: 8px; z-index: 4; }.traffic i { width: 12px; height: 12px; border-radius: 50%; display: block; box-shadow: inset 0 0 0 .5px rgba(0, 0, 0, .14); }
+.traffic i:nth-child(1) { background: #ff5f57; }
+.traffic i:nth-child(2) { background: #febc2e; }
+.traffic i:nth-child(3) { background: #28c840; }
+
+/* sidebar */
+.sidebar {
+  display: flex; flex-direction: column; min-height: 0;
+  padding: 50px 12px 12px;
+  border-right: 1px solid var(--hairline);
+  background: linear-gradient(180deg, rgba(255, 255, 255, .24), rgba(255, 255, 255, .06));
+}
+[data-theme="dark"] .sidebar { background: linear-gradient(180deg, rgba(255, 255, 255, .045), rgba(255, 255, 255, .012)); }
+
+.brand { display: flex; align-items: center; gap: 9px; padding: 0 8px; }
+.brand-logo {
+  width: 26px; height: 26px; border-radius: 8px; display: grid; place-items: center;
+  color: var(--accent);
+  background: linear-gradient(160deg, color-mix(in srgb, var(--accent) 22%, white), color-mix(in srgb, var(--accent) 8%, transparent));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 20%, transparent), 0 4px 10px -6px color-mix(in srgb, var(--accent) 60%, transparent);
+}
+[data-theme="dark"] .brand-logo { background: linear-gradient(160deg, rgba(77, 163, 255, .32), rgba(77, 163, 255, .10)); }
+.brand-name { font-size: 14px; font-weight: 650; letter-spacing: -.015em; }
+.brand-ver { font-size: 9.5px; color: var(--ink-3); font-weight: 500; margin-left: 1px; }
+
+.mode-block { margin: 16px 6px 0; padding: 10px 10px 11px; border-radius: 12px; background: var(--well); border: 1px solid var(--glass-stroke-2); }
+.mode-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 7px; }
+.mode-head span { font-size: 10px; font-weight: 650; color: var(--ink-3); letter-spacing: .02em; }
+.mode-stat { font-size: 9.5px !important; font-weight: 500 !important; color: var(--ink-3); letter-spacing: 0 !important; }
+.mode-block .seg { width: 100%; display: flex; }
+.mode-block .seg button { flex: 1; padding: 5px 0; font-size: 11px; }
+.mode-note { margin-top: 7px; font-size: 9.5px; line-height: 1.4; color: var(--ink-3); }
+
+.search { position: relative; margin: 14px 6px 0; }
+.search svg { position: absolute; left: 9px; top: 50%; transform: translateY(-50%); color: var(--ink-3); width: 13px; height: 13px; }
+.search input {
+  width: 100%; height: 30px; padding: 0 10px 0 28px;
+  border: 1px solid var(--glass-stroke-2); border-radius: 9px;
+  background: var(--input-bg); color: var(--ink); font-size: 11.5px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .35);
+}
+.search input::placeholder { color: var(--ink-3); }
+
+.list-head { display: flex; align-items: center; gap: 7px; padding: 16px 10px 7px; }
+.list-head span { font-size: 10px; font-weight: 650; color: var(--ink-3); letter-spacing: .02em; }
+.list-count { font-size: 9px; font-weight: 700; color: var(--ink-3); min-width: 15px; height: 15px; padding: 0 4px; border-radius: 999px; display: inline-grid; place-items: center; background: color-mix(in srgb, var(--ink-3) 13%, transparent); }
+
+.backend-list { flex: 1; min-height: 0; overflow: auto; padding: 0 2px 4px; scrollbar-width: none; }
+.backend-list::-webkit-scrollbar { display: none; }
+.list-empty { margin: 14px 8px; font-size: 10.5px; color: var(--ink-3); }
+
+.row {
+  display: grid; grid-template-columns: 14px 1fr auto; grid-template-rows: auto auto;
+  column-gap: 9px; row-gap: 2px;
+  align-items: center;
+  padding: 8px 9px 8px 10px; margin-bottom: 2px;
+  border-radius: 12px; border: 1px solid transparent;
+  transition: background .16s ease, box-shadow .16s ease, border-color .16s ease;
+  user-select: none;
+}
+.row:hover { background: var(--row-hover); }
+.row.sel {
+  background: var(--row-sel);
+  border-color: var(--glass-stroke-2);
+  box-shadow: 0 10px 22px -18px rgba(72, 46, 28, .42), inset 0 1px 0 rgba(255, 252, 245, .5);
+}
+.row .node { grid-row: 1 / 3; align-self: center; display: grid; place-items: center; width: 14px; }
+.row-name { font-size: 12px; font-weight: 600; letter-spacing: -.005em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.row .switch { justify-self: end; }
+.row-sub { grid-column: 2 / 4; display: flex; align-items: center; gap: 7px; min-width: 0; font-size: 10px; color: var(--ink-3); }
+.row-sub .addr { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 9.5px; }
+.row-sub .ms { margin-left: auto; font-size: 9.5px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.row-sub .ms.ok { color: var(--ok-ink); }
+.row-sub .ms.err { color: var(--bad-ink); }
+.row-sub .ms.warn { color: var(--warn-ink); }
+
+.sidebar-foot { display: flex; align-items: center; gap: 6px; padding: 8px 4px 0; border-top: 1px solid var(--hairline); margin-top: 4px; }
+.add-btn {
+  flex: 1; height: 30px; display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  border-radius: 9px; border: 1px solid var(--glass-stroke-2);
+  background: var(--input-bg); color: var(--ink-2);
+  font-size: 11px; font-weight: 600;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .4);
+}
+.add-btn:hover { color: var(--ink); background: color-mix(in srgb, var(--input-bg) 72%, white); }
+.settings-btn { width: 30px; height: 30px; }
+
+/* detail */
+.detail { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+.detail-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 20px; padding: 27px 32px 15px 34px; }
+.head-main { min-width: 0; }
+.name-input {
+  display: block; width: 100%; max-width: 480px;
+  margin: 0 0 7px -5px; padding: 1px 5px 2px;
+  border: 0; border-radius: 7px; background: transparent;
+  font-size: 21px; font-weight: 650; letter-spacing: -.025em; line-height: 1.25;
+}
+.name-input:hover { background: color-mix(in srgb, var(--well) 65%, transparent); }
+.name-input:focus { outline: none; background: var(--well); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 15%, transparent); }
+.head-sub { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.head-addr { font-size: 10.5px; color: var(--ink-2); }
+.mode-tag { font-size: 9.5px; font-weight: 600; color: var(--ink-3); padding: 2px 6px; border-radius: 5px; background: color-mix(in srgb, var(--ink-3) 10%, transparent); }
+.head-actions { display: flex; align-items: center; gap: 8px; padding-top: 5px; flex: none; }
+.switch-label { font-size: 10.5px; color: var(--ink-3); font-weight: 550; }
+
+/* signal strip */
+.signal {
+  display: flex; align-items: center; gap: 13px;
+  margin: 0 32px 0 34px; padding: 8px 10px 8px 14px;
+  min-height: 50px;
+  border-radius: 13px;
+  background: linear-gradient(180deg, color-mix(in srgb, var(--ok) 6%, var(--well)), var(--well));
+  border: 1px solid var(--glass-stroke-2);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .35);
+  transition: background .3s ease, border-color .3s ease;
+}
+.signal.off { background: var(--well); }
+.signal.err { background: linear-gradient(180deg, color-mix(in srgb, var(--bad) 7%, var(--well)), var(--well)); border-color: color-mix(in srgb, var(--bad) 18%, transparent); }
+.sig-state { display: flex; align-items: center; gap: 7px; font-size: 11px; font-weight: 600; white-space: nowrap; }
+.sig-latency { display: flex; align-items: baseline; gap: 2px; padding-left: 2px; white-space: nowrap; }
+.sig-latency b { font-family: var(--font-mono); font-size: 19px; font-weight: 600; letter-spacing: -.03em; font-variant-numeric: tabular-nums; }
+.sig-latency span { font-size: 9px; color: var(--ink-3); font-weight: 600; }
+.sig-wave { width: 158px; height: 30px; flex: 0 1 158px; min-width: 60px; }
+.sig-wave path.line { fill: none; stroke: var(--ok); stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+.sig-wave path.area { fill: url(#waveFill); stroke: none; }
+.signal.off .sig-wave path.line { stroke: var(--ink-3); }
+.signal.err .sig-wave path.line { stroke: var(--bad); }
+.sig-meta { display: flex; flex-direction: column; gap: 2px; margin-left: 4px; font-size: 9.5px; color: var(--ink-3); white-space: nowrap; }
+.sig-meta b { font-weight: 600; color: var(--ink-2); }
+.signal .btn { margin-left: auto; }
+[data-theme="dark"] .signal { box-shadow: inset 0 1px 0 rgba(255, 255, 255, .06); }
+
+/* buttons */
+.btn {
+  height: 30px; display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  padding: 0 12px; border-radius: 9px;
+  border: 1px solid var(--glass-stroke-2);
+  background: var(--input-bg); color: var(--ink-2);
+  font-size: 11px; font-weight: 600; white-space: nowrap;
+  box-shadow: inset 0 1px 0 rgba(255, 252, 245, .5), 0 1px 2px rgba(72, 55, 38, .05);
+  transition: background .16s ease, color .16s ease, transform .12s ease;
+}
+.btn:hover { color: var(--ink); background: color-mix(in srgb, var(--input-bg) 68%, white); }
+.btn:active { transform: translateY(.5px); }
+.btn.primary {
+  color: #2b1a12; border-color: transparent;
+  background: linear-gradient(180deg, #e08a6b, #d97757);
+  box-shadow: 0 1px 2px rgba(110, 55, 30, .25), inset 0 1px 0 rgba(255, 252, 245, .35);
+}
+.btn.primary:hover { background: linear-gradient(180deg, #e89a7d, #de8262); color: #2b1a12; }
+.btn.sm { height: 27px; padding: 0 10px; font-size: 10.5px; }
+.btn .tb-busy { display: none; align-items: center; gap: 6px; }
+.btn.busy { pointer-events: none; opacity: .85; }
+.btn.busy .tb-idle { display: none; }
+.btn.busy .tb-busy { display: inline-flex; }
+.spinner { width: 11px; height: 11px; border-radius: 50%; border: 1.5px solid currentColor; border-top-color: transparent; animation: spin .7s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.link-btn { border: 0; background: transparent; color: var(--accent); font-size: 10.5px; font-weight: 600; padding: 2px 4px; border-radius: 5px; display: inline-flex; align-items: center; gap: 4px; }
+.link-btn:hover { background: color-mix(in srgb, var(--accent) 9%, transparent); }
+
+/* scroll + sections */
+.detail-scroll { flex: 1; min-height: 0; overflow: auto; padding: 2px 32px 16px 34px; scrollbar-width: thin; scrollbar-color: color-mix(in srgb, var(--ink-3) 40%, transparent) transparent; }
+.detail-scroll::-webkit-scrollbar { width: 9px; }
+.detail-scroll::-webkit-scrollbar-thumb { background: color-mix(in srgb, var(--ink-3) 32%, transparent); border: 3px solid transparent; background-clip: padding-box; border-radius: 999px; }
+
+.section { padding: 15px 0 17px; border-top: 1px solid var(--hairline); }
+.section:first-child { border-top: 0; }
+.sec-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 18px; margin-bottom: 10px; }
+.sec-head h2 { margin: 0 0 2px; font-size: 12px; font-weight: 650; letter-spacing: -.005em; }
+.sec-head p { margin: 0; font-size: 10.5px; line-height: 1.45; color: var(--ink-3); max-width: 480px; }
+.transport-toggle { display: flex; align-items: center; gap: 8px; padding-top: 1px; flex: none; }
+.transport-toggle span { font-size: 10.5px; font-weight: 600; color: var(--ink-2); white-space: nowrap; }
+
+.well {
+  padding: 12px; border-radius: var(--r-well);
+  background: var(--well); border: 1px solid var(--glass-stroke-2);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .3);
+}
+.fields { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 12px; }
+.field { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
+.field.full { grid-column: 1 / -1; }
+.field > span { font-size: 10px; font-weight: 550; color: var(--ink-3); display: flex; align-items: center; gap: 5px; }
+.field > span .auto { font-size: 8.5px; font-weight: 600; color: var(--ink-3); padding: 1px 5px; border-radius: 4px; background: color-mix(in srgb, var(--ink-3) 12%, transparent); }
+
+input[type="text"], input[type="password"], input[type="number"], select {
+  width: 100%; height: 31px; padding: 0 9px;
+  border: 1px solid var(--hairline-strong); border-radius: 8px;
+  background: var(--input-bg); color: var(--ink);
+  font-size: 11.5px;
+  box-shadow: inset 0 1px 1px rgba(72, 55, 38, .05), inset 0 1px 0 rgba(255, 252, 245, .4);
+  transition: border-color .16s ease, box-shadow .16s ease, background .16s ease;
+}
+input.mono { font-family: var(--font-mono); font-size: 10.5px; letter-spacing: -.01em; }
+input:hover { border-color: color-mix(in srgb, var(--ink-3) 32%, transparent); }
+input:focus, select:focus {
+  outline: none; border-color: color-mix(in srgb, var(--accent) 55%, transparent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 14%, transparent);
+}
+select { appearance: none; background-image: linear-gradient(45deg, transparent 50%, var(--ink-3) 50%), linear-gradient(135deg, var(--ink-3) 50%, transparent 50%); background-position: calc(100% - 14px) 13px, calc(100% - 10px) 13px; background-size: 4px 4px, 4px 4px; background-repeat: no-repeat; padding-right: 24px; }
+
+.ssh-section { overflow: hidden; max-height: 420px; opacity: 1; transition: max-height .34s cubic-bezier(.2, .8, .3, 1), opacity .2s ease, padding .34s ease; }
+.detail[data-transport="direct"] .ssh-section { max-height: 0; opacity: 0; padding-top: 0; padding-bottom: 0; border-top-color: transparent; }
+
+.ssh-well { display: grid; gap: 10px; }
+.cmd { margin-top: 2px; border-radius: 10px; background: var(--code-bg); border: 1px solid var(--hairline); overflow: hidden; }
+.cmd-head { display: flex; align-items: center; justify-content: space-between; padding: 6px 8px 6px 10px; border-bottom: 1px solid var(--hairline); }
+.cmd-label { display: inline-flex; align-items: center; gap: 5px; font-size: 9.5px; font-weight: 600; color: var(--ink-3); }
+.cmd-head .link-btn { font-size: 9.5px; }
+.cmd code {
+  display: block; padding: 9px 10px; font-family: var(--font-mono); font-size: 10px; line-height: 1.6;
+  color: var(--ink-2); white-space: pre-wrap; word-break: break-all;
+}
+.cmd-note { margin: 0; padding: 0 10px 9px; font-size: 9.5px; line-height: 1.45; color: var(--ink-3); }
+
+.key-row { display: grid; grid-template-columns: 1fr; gap: 8px; }
+.key-input { position: relative; }
+.key-input input { padding-right: 34px; }
+.eye-btn { position: absolute; right: 3px; top: 3px; width: 25px; height: 25px; border: 0; border-radius: 6px; background: transparent; color: var(--ink-3); display: grid; place-items: center; }
+.eye-btn:hover { background: color-mix(in srgb, var(--ink-3) 12%, transparent); color: var(--ink-2); }
+.key-note { display: flex; align-items: center; gap: 6px; font-size: 9.5px; line-height: 1.4; color: var(--ink-3); }
+.key-note .i { width: 12px; height: 12px; }
+
+/* footer */
+.detail-foot {
+  display: flex; align-items: center; justify-content: space-between; gap: 14px;
+  padding: 11px 32px 13px 34px;
+  border-top: 1px solid var(--hairline);
+  background: color-mix(in srgb, var(--glass-fill) 26%, transparent);
+}
+.foot-main { display: flex; align-items: center; gap: 9px; min-width: 0; }
+.foot-label { font-size: 9.5px; color: var(--ink-3); white-space: nowrap; }
+.foot-url { font-family: var(--font-mono); font-size: 10px; color: var(--ink-2); padding: 4px 8px; border-radius: 6px; background: var(--code-bg); border: 1px solid var(--hairline); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* ---------- popover ---------- */
+.menubar {
+  width: 100%; height: 34px; display: flex; align-items: center; justify-content: space-between;
+  padding: 0 14px; border-radius: 12px;
+  color: var(--ink-2); font-size: 11px;
+  box-shadow: 0 10px 30px -18px rgba(72, 46, 28, .38);
+}
+.mb-left, .mb-right { display: flex; align-items: center; gap: 14px; }
+.mb-left b { font-weight: 650; color: var(--ink); }
+.mb-right > span, .mb-right > svg { color: var(--ink-2); }
+.mb-app {
+  position: relative; width: 26px; height: 22px; border: 0; border-radius: 6px;
+  background: transparent; color: var(--ink); display: grid; place-items: center;
+}
+.mb-app.on { background: color-mix(in srgb, var(--accent) 14%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 18%, transparent); }
+.mb-app .dot { position: absolute; right: 2px; top: 2px; width: 5px; height: 5px; box-shadow: none; }
+
+.popover {
+  width: 372px; margin: 10px 26px 0 0;
+  border-radius: 20px;
+  box-shadow: var(--shadow-pop), inset 0 1px 0 rgba(255, 252, 245, .9), inset 0 0 0 1px rgba(255, 252, 245, .24);
+  overflow: visible;
+}
+[data-theme="dark"] .popover {
+  box-shadow: var(--shadow-pop), inset 0 1px 0 rgba(255, 255, 255, .13), inset 0 0 0 1px rgba(255, 255, 255, .04);
+}
+.popover::after {
+  content: ""; position: absolute; top: -6.5px; right: 12px; width: 13px; height: 13px;
+  transform: rotate(45deg);
+  background: var(--glass-fill);
+  border-left: 1px solid var(--glass-stroke); border-top: 1px solid var(--glass-stroke);
+  border-top-left-radius: 4px;
+}
+.pop-inner { position: relative; z-index: 1; padding: 13px 12px 11px; }
+
+.pop-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; padding: 1px 3px 11px; }
+.pop-brand { display: flex; align-items: center; gap: 9px; }
+.pop-brand .brand-logo { width: 28px; height: 28px; }
+.pop-brand b { display: block; font-size: 13px; font-weight: 650; letter-spacing: -.015em; line-height: 1.3; }
+.pop-brand small { display: block; font-size: 9.5px; color: var(--ink-3); margin-top: 1px; }
+.pop-head-right { display: flex; align-items: center; gap: 7px; padding-top: 2px; }
+.pop-head-right .lbl { font-size: 9.5px; color: var(--ink-3); }
+
+.pop-summary { display: flex; align-items: center; justify-content: space-between; padding: 0 3px 9px; font-size: 9.5px; color: var(--ink-3); }
+
+.pop-list { display: grid; gap: 1px; }
+.prow {
+  display: grid; grid-template-columns: 9px 1fr auto 25px 32px; align-items: center; gap: 8px;
+  padding: 7px 5px 7px 9px; border-radius: 11px; border: 1px solid transparent;
+  user-select: none; transition: background .15s ease, border-color .15s ease;
+}
+.prow:hover { background: var(--row-hover); }
+.prow.sel { background: var(--row-sel); border-color: var(--glass-stroke-2); box-shadow: inset 0 1px 0 rgba(255, 255, 255, .4); }
+.prow-main { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.prow-name { font-size: 11.5px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.prow-sub { display: flex; align-items: center; gap: 6px; min-width: 0; font-size: 9px; color: var(--ink-3); }
+.prow-sub .mono { font-size: 9px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.prow-ms { font-size: 9.5px; font-variant-numeric: tabular-nums; color: var(--ink-3); white-space: nowrap; }
+.prow-ms.ok { color: var(--ok-ink); }
+.prow-ms.err { color: var(--bad-ink); }
+.prow-ms.warn { color: var(--warn-ink); }
+
+.copy-btn {
+  width: 25px; height: 25px; border: 0; border-radius: 7px; display: grid; place-items: center;
+  background: transparent; color: var(--ink-3); opacity: .55;
+  transition: opacity .15s ease, background .15s ease, color .15s ease;
+}
+.copy-btn:hover { opacity: 1; background: color-mix(in srgb, var(--ink-3) 12%, transparent); color: var(--ink); }
+.copy-btn .i { width: 13px; height: 13px; }
+
+.pop-foot { display: flex; align-items: center; gap: 7px; padding: 10px 3px 1px; margin-top: 8px; border-top: 1px solid var(--hairline); }
+.pop-foot .btn { flex: 1; height: 31px; }
+.pop-foot .icon-btn { width: 31px; height: 31px; }
+
+/* ---------- toast ---------- */
+.toast {
+  position: fixed; left: 50%; bottom: 26px; z-index: 50;
+  transform: translate(-50%, 16px); opacity: 0; pointer-events: none;
+  padding: 9px 15px; border-radius: 11px;
+  background: color-mix(in srgb, #2a2420 88%, transparent);
+  color: #fff; font-size: 11.5px; font-weight: 500; letter-spacing: .005em;
+  box-shadow: 0 16px 40px -14px rgba(0, 0, 0, .6);
+  backdrop-filter: blur(18px);
+  transition: opacity .22s ease, transform .26s cubic-bezier(.2, .8, .3, 1);
+}
+.toast.show { opacity: 1; transform: translate(-50%, 0); }
+
+@media (max-width: 1120px) {
+  .sig-wave { display: none; }
+}
+@media (max-width: 760px) {
+  .demo-bar { flex-wrap: wrap; padding: 10px 14px; }
+  .demo-hint { display: none; }
+  .stage { padding: 20px 14px 48px; }
+  .popover { margin-right: 0; }
+  .signal { gap: 9px; }
+  .sig-meta { display: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .001ms !important; animation-iteration-count: 1 !important; transition-duration: .001ms !important; }
+}
+</style>
+</head>
+<body data-view="main">
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <linearGradient id="waveFill" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="var(--ok)" stop-opacity=".22" />
+      <stop offset="100%" stop-color="var(--ok)" stop-opacity="0" />
+    </linearGradient>
+  </defs>
+  <symbol id="i-chain" viewBox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7.07 0l2.12-2.12a5 5 0 0 0-7.07-7.07L11 4.93"/><path d="M14 11a5 5 0 0 0-7.07 0L4.8 13.12a5 5 0 0 0 7.07 7.07L13 19.07"/></symbol>
+  <symbol id="i-copy" viewBox="0 0 24 24"><rect x="9" y="9" width="11" height="11" rx="2.5"/><path d="M5 15H4.5A1.5 1.5 0 0 1 3 13.5v-9A1.5 1.5 0 0 1 4.5 3h9A1.5 1.5 0 0 1 15 4.5V5"/></symbol>
+  <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+  <symbol id="i-gear" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.87l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06A1.7 1.7 0 0 0 15 19.4a1.7 1.7 0 0 0-1 1.55V21a2 2 0 1 1-4 0v-.09A1.7 1.7 0 0 0 9 19.4a1.7 1.7 0 0 0-1.87.34l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.7 1.7 0 0 0 4.6 15a1.7 1.7 0 0 0-1.55-1H3a2 2 0 1 1 0-4h.09A1.7 1.7 0 0 0 4.6 9a1.7 1.7 0 0 0-.34-1.87l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.7 1.7 0 0 0 9 4.6 1.7 1.7 0 0 0 10 3.05V3a2 2 0 1 1 4 0v.09A1.7 1.7 0 0 0 15 4.6a1.7 1.7 0 0 0 1.87-.34l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.7 1.7 0 0 0 19.4 9a1.7 1.7 0 0 0 1.55 1H21a2 2 0 1 1 0 4h-.09a1.7 1.7 0 0 0-1.51 1z"/></symbol>
+  <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></symbol>
+  <symbol id="i-power" viewBox="0 0 24 24"><path d="M12 3v9"/><path d="M6.4 6.4a8 8 0 1 0 11.2 0"/></symbol>
+  <symbol id="i-eye" viewBox="0 0 24 24"><path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z"/><circle cx="12" cy="12" r="2.8"/></symbol>
+  <symbol id="i-eye-off" viewBox="0 0 24 24"><path d="M3 3l18 18"/><path d="M10.6 6.1A9.9 9.9 0 0 1 12 6c6 0 9.5 6 9.5 6a17 17 0 0 1-2.4 3.1"/><path d="M6.2 6.2A16.8 16.8 0 0 0 2.5 12S6 18 12 18a9.7 9.7 0 0 0 4.1-.9"/><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2"/></symbol>
+  <symbol id="i-bolt" viewBox="0 0 24 24"><path d="M13 2 4.5 13.5H11l-1 8.5L19.5 10H13l1-8z"/></symbol>
+  <symbol id="i-terminal" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="3"/><path d="m7 9 3 3-3 3M13 15h4"/></symbol>
+  <symbol id="i-lock" viewBox="0 0 24 24"><rect x="4.5" y="10.5" width="15" height="10" rx="2.5"/><path d="M8 10.5V8a4 4 0 0 1 8 0v2.5"/></symbol>
+  <symbol id="i-wifi" viewBox="0 0 24 24"><path d="M2.5 9a15 15 0 0 1 19 0"/><path d="M5.5 12.5a10.5 10.5 0 0 1 13 0"/><path d="M8.5 16a6 6 0 0 1 7 0"/><circle cx="12" cy="19" r="1"/></symbol>
+  <symbol id="i-battery" viewBox="0 0 24 24"><rect x="2.5" y="8" width="17" height="8" rx="2.2"/><path d="M22 10.5v3"/><rect x="5" y="10" width="10" height="4" rx="1" fill="currentColor" stroke="none"/></symbol>
+  <symbol id="i-moon" viewBox="0 0 24 24"><path d="M20 14.5A8.5 8.5 0 0 1 9.5 4 8.5 8.5 0 1 0 20 14.5z"/></symbol>
+  <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></symbol>
+  <symbol id="i-window" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="3"/><path d="M3 9h18"/><path d="M6.5 6.5h.01M9.5 6.5h.01"/></symbol>
+  <symbol id="i-more" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.2" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="1.2" fill="currentColor" stroke="none"/><circle cx="19" cy="12" r="1.2" fill="currentColor" stroke="none"/></symbol>
+  <symbol id="i-server" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="7" rx="2"/><rect x="3" y="13" width="18" height="7" rx="2"/><path d="M7 7.5h.01M7 16.5h.01"/></symbol>
+</svg>
+
+<div class="aurora" aria-hidden="true">
+  <span class="blob b1"></span><span class="blob b2"></span><span class="blob b3"></span><span class="blob b4"></span>
+  <span class="grain"></span>
+</div>
+
+<header class="demo-bar">
+  <div class="demo-title">
+    <span class="mark"><svg class="i sm"><use href="#i-chain"/></svg></span>
+    FreeAPI 设计稿
+    <span class="ver">多后端 · v2 concept</span>
+  </div>
+  <div class="demo-actions">
+    <span class="demo-hint">可点击切换、测试、改字段</span>
+    <div class="seg views" id="viewTabs">
+      <button data-view="main" class="on">主窗口</button>
+      <button data-view="popover">菜单栏</button>
+      <button data-view="both">并排</button>
+    </div>
+    <button class="icon-btn" id="themeBtn" aria-label="切换深色外观" title="切换深色外观">
+      <svg class="i"><use id="themeIcon" href="#i-moon"/></svg>
+    </button>
+  </div>
+</header>
+
+<main class="stage">
+  <!-- main window -->
+  <section class="view-main" id="viewMain">
+    <div class="app-window glass" id="appWindow">
+      <div class="traffic" aria-hidden="true"><i></i><i></i><i></i></div>
+
+      <aside class="sidebar">
+        <div class="brand">
+          <span class="brand-logo"><svg class="i"><use href="#i-chain"/></svg></span>
+          <span class="brand-name">FreeAPI</span>
+          <span class="brand-ver">2.0</span>
+        </div>
+
+        <div class="mode-block">
+          <div class="mode-head"><span>运行模式</span><span class="mode-stat" id="modeHint">2 个运行中</span></div>
+          <div class="seg" id="modeSeg">
+            <button data-mode="parallel" class="on">并行</button>
+            <button data-mode="single">单路</button>
+          </div>
+          <p class="mode-note" id="modeNote">每个后端使用独立本地端口，可同时提供。</p>
+        </div>
+
+        <div class="search">
+          <svg class="i"><use href="#i-search"/></svg>
+          <input type="text" id="searchInput" placeholder="搜索后端" aria-label="搜索后端" />
+        </div>
+
+        <div class="list-head"><span>后端</span><span class="list-count" id="countLabel">4</span></div>
+        <div class="backend-list" id="backendList"></div>
+
+        <div class="sidebar-foot">
+          <button class="add-btn" id="addBackend"><svg class="i sm"><use href="#i-plus"/></svg>添加后端</button>
+          <button class="icon-btn settings-btn" id="settingsBtn" aria-label="全局设置" title="全局设置"><svg class="i sm"><use href="#i-gear"/></svg></button>
+        </div>
+      </aside>
+
+      <section class="detail" id="detail" data-transport="ssh">
+        <header class="detail-head">
+          <div class="head-main">
+            <input class="name-input" id="fName" value="上海 GPU 集群" aria-label="后端名称" spellcheck="false" />
+            <div class="head-sub">
+              <span class="chip ok" id="dChip"></span>
+              <span class="mono head-addr" id="dSub"></span>
+              <span class="mode-tag" id="dTransport"></span>
+            </div>
+          </div>
+          <div class="head-actions">
+            <span class="switch-label">启用</span>
+            <button class="switch on" id="dEnabled" role="switch" aria-checked="true" aria-label="启用此后端"><span class="track"></span><span class="thumb"></span></button>
+          </div>
+        </header>
+
+        <div class="signal" id="signal">
+          <span class="sig-state"><span class="dot ok" id="sigDot"></span><span id="sigText">已连接</span></span>
+          <span class="sig-latency"><b id="sigMs">12</b><span>ms</span></span>
+          <svg class="sig-wave" viewBox="0 0 158 30" preserveAspectRatio="none" aria-hidden="true">
+            <path class="area" id="waveArea" d="" />
+            <path class="line" id="waveLine" d="" />
+          </svg>
+          <span class="sig-meta"><span>HTTP <b id="sigHttp">200</b></span><span>检查于 <b id="sigWhen">刚刚</b></span></span>
+          <button class="btn primary sm" id="testBtn">
+            <span class="tb-idle" style="display:inline-flex;align-items:center;gap:6px"><svg class="i sm"><use href="#i-bolt"/></svg>测试连接</span>
+            <span class="tb-busy"><span class="spinner"></span>正在测试</span>
+          </button>
+        </div>
+
+        <div class="detail-scroll">
+          <section class="section">
+            <div class="sec-head">
+              <div>
+                <h2>连接方式</h2>
+                <p id="transportNote">经跳板机转发；本机监听 127.0.0.1，服务器地址必须能被跳板机访问。</p>
+              </div>
+              <div class="transport-toggle">
+                <span>SSH 隧道</span>
+                <button class="switch on" id="transportSwitch" role="switch" aria-checked="true" aria-label="使用 SSH 隧道"><span class="track"></span><span class="thumb"></span></button>
+              </div>
+            </div>
+
+            <div class="well fields">
+              <label class="field"><span>服务器地址</span><input type="text" id="fHost" class="mono" spellcheck="false" /></label>
+              <label class="field"><span>端口</span><input type="number" id="fPort" class="mono" min="1" max="65535" /></label>
+              <label class="field direct-only" id="schemeField"><span>协议</span>
+                <select id="fScheme"><option value="https">https</option><option value="http">http</option></select>
+              </label>
+              <label class="field"><span>API 路径</span><input type="text" id="fPath" class="mono" spellcheck="false" /></label>
+              <label class="field ssh-only"><span>本地端口 <span class="auto">自动分配</span></span><input type="number" id="fLocal" class="mono" min="1024" max="65535" /></label>
+            </div>
+          </section>
+
+          <section class="section">
+            <div class="sec-head">
+              <div>
+                <h2>凭据</h2>
+                <p>只用于连通性测试与客户端提示；应用本身不转发鉴权头。</p>
+              </div>
+            </div>
+            <div class="well key-row">
+              <label class="field"><span>API Key</span>
+                <div class="key-input">
+                  <input type="password" id="fKey" class="mono" spellcheck="false" autocomplete="off" placeholder="sk-…" />
+                  <button class="eye-btn" id="eyeBtn" aria-label="显示 API Key" title="显示 API Key"><svg class="i sm"><use id="eyeIcon" href="#i-eye"/></svg></button>
+                </div>
+              </label>
+              <div class="key-note"><svg class="i"><use href="#i-lock"/></svg>保存在 macOS 钥匙串；不写入配置文件，也不会出现在日志里。</div>
+            </div>
+          </section>
+
+          <section class="section ssh-section" id="sshSection">
+            <div class="sec-head">
+              <div>
+                <h2>跳板机</h2>
+                <p>服务器地址必须能被跳板机访问。密钥和 ProxyJump 可以写在 ~/.ssh/config 里。</p>
+              </div>
+            </div>
+            <div class="well ssh-well">
+              <label class="field full"><span>SSH 目标</span><input type="text" id="fSsh" class="mono" spellcheck="false" placeholder="user@bastion.example.com 或 Host 别名" /></label>
+              <div class="cmd">
+                <div class="cmd-head">
+                  <span class="cmd-label"><svg class="i sm"><use href="#i-terminal"/></svg>生成的 SSH 命令</span>
+                  <button class="link-btn" id="copyCmd"><svg class="i sm"><use href="#i-copy"/></svg>复制</button>
+                </div>
+                <code id="fCmd"></code>
+                <p class="cmd-note">固定启用 BatchMode 与严格主机校验；端口、密钥、跳板链沿用你的 SSH 配置。</p>
+              </div>
+            </div>
+          </section>
+        </div>
+
+        <footer class="detail-foot">
+          <div class="foot-main">
+            <span class="foot-label">客户端使用</span>
+            <code class="foot-url" id="fBase"></code>
+          </div>
+          <button class="btn" id="copyBase"><svg class="i sm"><use href="#i-copy"/></svg>复制地址</button>
+        </footer>
+      </section>
+    </div>
+  </section>
+
+  <!-- menu bar popover -->
+  <section class="view-popover" id="viewPopover">
+    <div class="menubar glass">
+      <div class="mb-left"><b>Finder</b><span>文件</span><span>编辑</span><span>显示</span><span>前往</span><span>窗口</span><span>帮助</span></div>
+      <div class="mb-right">
+        <svg class="i sm"><use href="#i-wifi"/></svg>
+        <svg class="i sm"><use href="#i-battery"/></svg>
+        <span>15:04</span>
+        <button class="mb-app on" aria-label="FreeAPI 菜单栏"><svg class="i sm"><use href="#i-chain"/></svg><span class="dot ok"></span></button>
+      </div>
+    </div>
+
+    <div class="popover glass">
+      <div class="pop-inner">
+        <header class="pop-head">
+          <div class="pop-brand">
+            <span class="brand-logo"><svg class="i"><use href="#i-chain"/></svg></span>
+            <div><b>FreeAPI</b><small>本地 API 网关</small></div>
+          </div>
+          <div class="pop-head-right">
+            <span class="lbl">全部</span>
+            <button class="switch sm" id="popMaster" role="switch" aria-checked="false" aria-label="全部启用"><span class="track"></span><span class="thumb"></span></button>
+          </div>
+        </header>
+
+        <div class="pop-summary">
+          <span id="popSummary">0 / 4 已连接</span>
+          <div class="seg tiny" id="popModeSeg">
+            <button data-mode="parallel" class="on">并行</button>
+            <button data-mode="single">单路</button>
+          </div>
+        </div>
+
+        <div class="pop-list" id="popList"></div>
+
+        <footer class="pop-foot">
+          <button class="btn" id="popOpen"><svg class="i sm"><use href="#i-window"/></svg>打开主窗口</button>
+          <button class="icon-btn" id="popQuit" aria-label="退出 FreeAPI" title="退出 FreeAPI"><svg class="i sm"><use href="#i-power"/></svg></button>
+        </footer>
+      </div>
+    </div>
+  </section>
+</main>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script>
+(function () {
+  'use strict';
+
+  const $ = (s, r) => (r || document).querySelector(s);
+  const $$ = (s, r) => Array.from((r || document).querySelectorAll(s));
+  const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+  const seed = [
+    {
+      id: 'sh', name: '上海 GPU 集群', transport: 'ssh', scheme: 'https',
+      host: 'api.sh-gpu.example.com', port: 8189, path: '/v1', local: 18189,
+      ssh: 'hnzhao@bastion.sh-gpu.example.com',
+      enabled: true, latency: 12, baseLatency: 12, http: '200', when: '刚刚',
+      history: [18, 15, 14, 16, 12, 13, 11, 12, 14, 12, 13, 12, 11, 12, 15, 13, 12, 11, 12, 12],
+      key: 'sk-live-7f3a9c2e8b1d4f6a8f2a', testFails: false, errorText: ''
+    },
+    {
+      id: 'ds', name: 'DeepSeek 官方', transport: 'direct', scheme: 'https',
+      host: 'api.deepseek.com', port: 443, path: '/v1', local: 18190,
+      ssh: '', enabled: true, latency: 98, baseLatency: 96, http: '200', when: '12 秒前',
+      history: [104, 96, 99, 92, 101, 95, 97, 108, 94, 99, 96, 98, 95, 102, 97, 96, 99, 97, 98, 98],
+      key: 'sk-ds-4c81a0f3', testFails: false, errorText: ''
+    },
+    {
+      id: 'al', name: 'Alioth 大模型', transport: 'ssh', scheme: 'http',
+      host: 'api.alioth.internal', port: 8080, path: '/v1', local: 18191,
+      ssh: 'hnzhao@login.alioth', enabled: false, latency: null, baseLatency: 34,
+      http: '—', when: '未检查', history: [],
+      key: '', testFails: true, errorText: 'SSH 认证失败，检查密钥或 ~/.ssh/config'
+    },
+    {
+      id: 'hz', name: '杭州推理集群', transport: 'ssh', scheme: 'http',
+      host: 'infer.hz.example.com', port: 8443, path: '/v1', local: 18192,
+      ssh: 'hnzhao@jump.hz', enabled: false, latency: null, baseLatency: 28,
+      http: '—', when: '未检查', history: [],
+      key: 'sk-hz-2d7e91ba', testFails: false, errorText: ''
+    }
+  ];
+
+  const backends = JSON.parse(JSON.stringify(seed));
+  const state = { selected: 'sh', mode: 'parallel', theme: 'light', view: 'main' };
+
+  const current = () => backends.find((b) => b.id === state.selected) || backends[0];
+
+  function statusOf(b) {
+    if (b.err) return { key: 'err', label: '连接异常' };
+    if (!b.enabled) return { key: 'off', label: '未启用' };
+    if (b.connecting) return { key: 'warn', label: '正在连接' };
+    return { key: 'ok', label: '已连接' };
+  }
+
+  function msOf(b) {
+    if (b.err) return { text: '失败', key: 'err' };
+    if (!b.enabled) return { text: '—', key: 'off' };
+    if (b.connecting) return { text: '连接中', key: 'warn' };
+    return b.latency ? { text: b.latency + ' ms', key: 'ok' } : { text: '—', key: 'off' };
+  }
+
+  function localAddr(b) {
+    return b.transport === 'ssh' ? '127.0.0.1:' + b.local : b.host;
+  }
+
+  function urlFor(b) {
+    if (b.transport === 'ssh') return 'http://127.0.0.1:' + b.local + (b.path || '');
+    const defaultPort = (b.scheme === 'https' && Number(b.port) === 443) || (b.scheme === 'http' && Number(b.port) === 80);
+    return (b.scheme || 'https') + '://' + b.host + (defaultPort ? '' : ':' + b.port) + (b.path || '');
+  }
+
+  function sshFor(b) {
+    const host = b.host.indexOf(':') >= 0 ? '[' + b.host + ']' : b.host;
+    return 'ssh -NT -o BatchMode=yes -o ExitOnForwardFailure=yes -o ServerAliveInterval=10 -o StrictHostKeyChecking=yes'
+      + ' -L 127.0.0.1:' + b.local + ':' + host + ':' + b.port + ' ' + (b.ssh || 'user@bastion');
+  }
+
+  function nextLocal() {
+    return backends.reduce((max, b) => Math.max(max, Number(b.local) || 0), 18188) + 1;
+  }
+
+  function setVal(el, value) {
+    if (!el || document.activeElement === el) return;
+    el.value = value == null ? '' : value;
+  }
+
+  /* ---------- lists ---------- */
+  function switchHTML(b, small) {
+    const on = b.enabled;
+    return '<button class="switch ' + (small ? 'sm ' : '') + (on ? 'on' : '') + '" data-toggle="' + b.id + '"'
+      + ' role="switch" aria-checked="' + on + '" aria-label="' + (on ? '停用' : '启用') + ' ' + esc(b.name) + '">'
+      + '<span class="track"></span><span class="thumb"></span></button>';
+  }
+
+  function renderList() {
+    const query = ($('#searchInput') ? $('#searchInput').value : '').trim().toLowerCase();
+    const shown = query
+      ? backends.filter((b) => (b.name + ' ' + b.host).toLowerCase().indexOf(query) >= 0)
+      : backends;
+    const html = shown.map((b) => {
+      const st = statusOf(b);
+      const ms = msOf(b);
+      const sel = b.id === state.selected;
+      return '<div class="row ' + (sel ? 'sel' : '') + '" data-select="' + b.id + '" role="button" tabindex="0" aria-pressed="' + sel + '">'
+        + '<span class="node"><span class="dot ' + st.key + '"></span></span>'
+        + '<span class="row-name">' + esc(b.name) + '</span>'
+        + switchHTML(b, true)
+        + '<span class="row-sub"><span class="tag ' + (b.transport === 'ssh' ? 'ssh' : 'direct') + '">' + (b.transport === 'ssh' ? 'SSH' : '直连') + '</span>'
+        + '<span class="addr mono">' + esc(localAddr(b)) + '</span>'
+        + '<span class="ms ' + ms.key + '">' + ms.text + '</span></span>'
+        + '</div>';
+    }).join('');
+    $('#backendList').innerHTML = html || '<p class="list-empty">没有匹配的后端</p>';
+    $('#countLabel').textContent = String(shown.length);
+    $('#modeHint').textContent = backends.filter((b) => b.enabled).length + ' 个运行中';
+  }
+
+  function renderPopover() {
+    const html = backends.map((b) => {
+      const st = statusOf(b);
+      const ms = msOf(b);
+      const sel = b.id === state.selected;
+      return '<div class="prow ' + (sel ? 'sel' : '') + '" data-select="' + b.id + '" role="button" tabindex="0" aria-pressed="' + sel + '">'
+        + '<span class="dot ' + st.key + '"></span>'
+        + '<span class="prow-main"><span class="prow-name">' + esc(b.name) + '</span>'
+        + '<span class="prow-sub"><span class="tag ' + (b.transport === 'ssh' ? 'ssh' : 'direct') + '">' + (b.transport === 'ssh' ? 'SSH' : '直连') + '</span>'
+        + '<span class="mono">' + esc(localAddr(b)) + '</span></span></span>'
+        + '<span class="prow-ms ' + ms.key + '">' + ms.text + '</span>'
+        + '<button class="copy-btn" data-copy="' + esc(urlFor(b)) + '" data-copy-label="已复制 ' + esc(b.name) + ' 的地址" aria-label="复制地址" title="复制地址"><svg class="i"><use href="#i-copy"/></svg></button>'
+        + switchHTML(b, true)
+        + '</div>';
+    }).join('');
+    $('#popList').innerHTML = html;
+
+    const okCount = backends.filter((b) => statusOf(b).key === 'ok').length;
+    $('#popSummary').textContent = okCount + ' / ' + backends.length + ' 已连接';
+
+    const allOn = backends.every((b) => b.enabled);
+    const master = $('#popMaster');
+    master.classList.toggle('on', allOn);
+    master.setAttribute('aria-checked', String(allOn));
+  }
+
+  function renderModes() {
+    $$('[data-mode]').forEach((btn) => btn.classList.toggle('on', btn.dataset.mode === state.mode));
+    $('#modeNote').textContent = state.mode === 'parallel'
+      ? '每个后端使用独立本地端口，可同时提供。'
+      : '同一时间只运行一个后端，切换时自动停用其它后端。';
+  }
+
+  /* ---------- detail ---------- */
+  function drawWave(b) {
+    const vals = (b.enabled && !b.err && b.history.length) ? b.history : [1, 1, 1, 1, 1, 1, 1, 1];
+    const w = 158, h = 30, pad = 3;
+    const min = Math.min.apply(null, vals);
+    const max = Math.max.apply(null, vals);
+    const span = Math.max(1, max - min);
+    const pts = vals.map((v, i) => {
+      const x = pad + (w - pad * 2) * i / Math.max(1, vals.length - 1);
+      const y = pad + (h - pad * 2) * (1 - (v - min) / span);
+      return [x, y];
+    });
+    let d = 'M ' + pts[0][0].toFixed(1) + ' ' + pts[0][1].toFixed(1);
+    for (let i = 1; i < pts.length; i++) {
+      const mx = (pts[i - 1][0] + pts[i][0]) / 2;
+      d += ' C ' + mx.toFixed(1) + ' ' + pts[i - 1][1].toFixed(1) + ', ' + mx.toFixed(1) + ' ' + pts[i][1].toFixed(1) + ', ' + pts[i][0].toFixed(1) + ' ' + pts[i][1].toFixed(1);
+    }
+    $('#waveLine').setAttribute('d', d);
+    $('#waveArea').setAttribute('d', d + ' L ' + (w - pad) + ' ' + h + ' L ' + pad + ' ' + h + ' Z');
+  }
+
+  function syncDetail() {
+    const b = current();
+    const st = statusOf(b);
+    const detail = $('#detail');
+    detail.dataset.transport = b.transport;
+
+    setVal($('#fName'), b.name);
+    const chip = $('#dChip');
+    chip.className = 'chip ' + st.key;
+    chip.innerHTML = '<span class="dot ' + st.key + '"></span>' + st.label;
+    $('#dSub').textContent = b.host + ':' + b.port;
+    $('#dTransport').textContent = b.transport === 'ssh' ? 'SSH 隧道' : '直连';
+
+    const en = $('#dEnabled');
+    en.classList.toggle('on', b.enabled);
+    en.setAttribute('aria-checked', String(b.enabled));
+
+    const ts = $('#transportSwitch');
+    ts.classList.toggle('on', b.transport === 'ssh');
+    ts.setAttribute('aria-checked', String(b.transport === 'ssh'));
+    $('#transportNote').textContent = b.transport === 'ssh'
+      ? '经跳板机转发；本机监听 127.0.0.1，服务器地址必须能被跳板机访问。'
+      : '客户端直接连接服务器地址，本机不启动转发进程。';
+
+    setVal($('#fHost'), b.host);
+    setVal($('#fPort'), b.port);
+    setVal($('#fPath'), b.path);
+    setVal($('#fScheme'), b.scheme);
+    setVal($('#fSsh'), b.ssh);
+    setVal($('#fLocal'), b.local);
+
+    $('#fCmd').textContent = sshFor(b);
+    $('#fBase').textContent = urlFor(b);
+
+    const sig = $('#signal');
+    sig.classList.toggle('off', !b.enabled || !!b.err);
+    sig.classList.toggle('err', !!b.err);
+    $('#sigDot').className = 'dot ' + st.key;
+    $('#sigText').textContent = st.label;
+    const live = b.enabled && !b.err && !b.connecting && b.latency != null;
+    $('#sigMs').textContent = live ? String(b.latency) : '—';
+    $('#sigHttp').textContent = live ? (b.http || '200') : '—';
+    $('#sigWhen').textContent = b.err ? '刚刚' : (live ? b.when : '未检查');
+
+    const errDetail = b.err ? b.errorText : '';
+    $('#sigText').title = errDetail;
+    drawWave(b);
+  }
+
+  function renderAll() {
+    renderList();
+    renderPopover();
+    renderModes();
+    syncDetail();
+  }
+
+  /* ---------- actions ---------- */
+  function selectBackend(id) {
+    if (!backends.some((b) => b.id === id)) return;
+    state.selected = id;
+    renderAll();
+  }
+
+  function toggleBackend(id) {
+    const b = backends.find((x) => x.id === id);
+    if (!b) return;
+    if (b.enabled) {
+      b.enabled = false;
+      b.connecting = false;
+      b.err = false;
+      renderAll();
+      return;
+    }
+    if (state.mode === 'single') {
+      backends.forEach((x) => { x.enabled = false; x.connecting = false; x.err = false; });
+      state.selected = id;
+    }
+    b.enabled = true;
+    b.err = false;
+    b.connecting = true;
+    renderAll();
+    window.setTimeout(() => {
+      b.connecting = false;
+      if (!b.latency) b.latency = b.baseLatency || 24;
+      if (!b.http || b.http === '—') { b.http = '200'; b.when = '刚刚'; b.history = [b.latency, b.latency, b.latency, b.latency]; }
+      renderAll();
+    }, 850);
+  }
+
+  function setMode(mode) {
+    if (mode !== 'parallel' && mode !== 'single') return;
+    state.mode = mode;
+    if (mode === 'single') {
+      backends.forEach((b) => {
+        b.enabled = b.id === state.selected;
+        b.connecting = false;
+        b.err = false;
+      });
+    }
+    renderAll();
+    toast(mode === 'single' ? '单路模式：只运行当前选中的后端' : '并行模式：每个后端使用独立本地端口');
+  }
+
+  function setAll(on) {
+    if (on) {
+      if (state.mode === 'single') {
+        backends.forEach((b) => { b.enabled = b.id === state.selected; });
+      } else {
+        backends.forEach((b) => { b.enabled = true; });
+      }
+      backends.forEach((b) => { b.connecting = b.enabled; b.err = false; });
+      renderAll();
+      backends.forEach((b) => {
+        if (!b.enabled) return;
+        window.setTimeout(() => {
+          b.connecting = false;
+          if (!b.latency) b.latency = b.baseLatency || 24;
+          if (!b.http || b.http === '—') { b.http = '200'; b.when = '刚刚'; b.history = [b.latency, b.latency, b.latency, b.latency]; }
+          renderAll();
+        }, 700 + Math.random() * 500);
+      });
+    } else {
+      backends.forEach((b) => { b.enabled = false; b.connecting = false; b.err = false; });
+      renderAll();
+    }
+  }
+
+  function addBackend() {
+    const n = backends.length + 1;
+    const b = {
+      id: 'n' + Date.now(), name: '新后端 ' + n, transport: 'ssh', scheme: 'http',
+      host: '', port: 8080, path: '/v1', local: nextLocal(), ssh: '',
+      enabled: false, latency: null, baseLatency: 24, http: '—', when: '未检查', history: [],
+      key: '', testFails: false, errorText: ''
+    };
+    backends.push(b);
+    state.selected = b.id;
+    renderAll();
+    window.setTimeout(() => { $('#fName').focus(); $('#fName').select(); }, 20);
+    toast('已添加后端，填写地址后启用');
+  }
+
+  function testConnection() {
+    const b = current();
+    const btn = $('#testBtn');
+    if (btn.classList.contains('busy')) return;
+    btn.classList.add('busy');
+    window.setTimeout(() => {
+      if (b.testFails) {
+        b.err = true;
+        b.latency = null;
+        b.http = '—';
+        b.when = '刚刚';
+        toast('测试失败：' + b.errorText);
+      } else {
+        b.err = false;
+        b.latency = Math.round((b.baseLatency || 24) * (0.86 + Math.random() * 0.28));
+        b.http = '200';
+        b.when = '刚刚';
+        b.history = b.history.concat([b.latency]).slice(-20);
+        toast('连接正常 · ' + b.latency + ' ms');
+      }
+      btn.classList.remove('busy');
+      renderAll();
+    }, 900 + Math.random() * 500);
+  }
+
+  let toastTimer = null;
+  function toast(message) {
+    const el = $('#toast');
+    el.textContent = message;
+    el.classList.add('show');
+    window.clearTimeout(toastTimer);
+    toastTimer = window.setTimeout(() => el.classList.remove('show'), 2200);
+  }
+
+  function fallbackCopy(text) {
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.position = 'fixed';
+    ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.select();
+    try { document.execCommand('copy'); } catch (e) { /* ignore */ }
+    document.body.removeChild(ta);
+  }
+
+  function copyText(text, label) {
+    const done = () => toast(label || '已复制');
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(done, () => { fallbackCopy(text); done(); });
+    } else {
+      fallbackCopy(text);
+      done();
+    }
+  }
+
+  /* ---------- view / theme ---------- */
+  function setView(view) {
+    state.view = view;
+    document.body.dataset.view = view;
+    $$('#viewTabs button').forEach((b) => b.classList.toggle('on', b.dataset.view === view));
+    window.requestAnimationFrame(fit);
+  }
+
+  function fit() {
+    const win = $('#appWindow');
+    if (!win) return;
+    if (state.view === 'popover') { win.style.zoom = 1; return; }
+    const mainView = $('#viewMain');
+    let avail = mainView.clientWidth;
+    if (state.view === 'both') {
+      const stageW = $('.stage').clientWidth;
+      avail = Math.max(500, stageW - 420 - 56);
+    }
+    const scale = Math.min(1, Math.max(0.5, avail / 1040));
+    win.style.zoom = String(scale);
+  }
+
+  function setTheme(theme) {
+    state.theme = theme;
+    document.documentElement.dataset.theme = theme;
+    $('#themeIcon').setAttribute('href', theme === 'dark' ? '#i-sun' : '#i-moon');
+    $('#themeBtn').setAttribute('aria-label', theme === 'dark' ? '切换浅色外观' : '切换深色外观');
+    $('#themeBtn').title = theme === 'dark' ? '切换浅色外观' : '切换深色外观';
+  }
+
+  /* ---------- events ---------- */
+  document.addEventListener('click', (e) => {
+    const copy = e.target.closest('[data-copy]');
+    if (copy) {
+      e.preventDefault();
+      copyText(copy.dataset.copy, copy.dataset.copyLabel || '已复制');
+      return;
+    }
+    const toggle = e.target.closest('[data-toggle]');
+    if (toggle) {
+      e.preventDefault();
+      toggleBackend(toggle.dataset.toggle);
+      return;
+    }
+    const sel = e.target.closest('[data-select]');
+    if (sel) {
+      e.preventDefault();
+      selectBackend(sel.dataset.select);
+      return;
+    }
+    const mode = e.target.closest('[data-mode]');
+    if (mode) setMode(mode.dataset.mode);
+  });
+
+  document.addEventListener('keydown', (e) => {
+    if (e.key !== 'Enter' && e.key !== ' ') return;
+    const row = e.target.closest('[data-select]');
+    if (row) {
+      e.preventDefault();
+      selectBackend(row.dataset.select);
+    }
+  });
+
+  $('#fName').addEventListener('input', () => {
+    current().name = $('#fName').value;
+    renderList();
+    renderPopover();
+  });
+
+  const bindings = [
+    ['fHost', 'host', String], ['fPort', 'port', Number], ['fPath', 'path', String],
+    ['fSsh', 'ssh', String], ['fLocal', 'local', Number], ['fKey', 'key', String],
+    ['fScheme', 'scheme', String]
+  ];
+  bindings.forEach(([id, key, cast]) => {
+    $('#' + id).addEventListener('input', () => {
+      const b = current();
+      b[key] = cast($('#' + id).value);
+      $('#fCmd').textContent = sshFor(b);
+      $('#fBase').textContent = urlFor(b);
+      $('#dSub').textContent = b.host + ':' + b.port;
+      renderList();
+      renderPopover();
+    });
+  });
+
+  $('#dEnabled').addEventListener('click', () => toggleBackend(state.selected));
+  $('#transportSwitch').addEventListener('click', () => {
+    const b = current();
+    b.transport = b.transport === 'ssh' ? 'direct' : 'ssh';
+    if (b.transport === 'ssh' && !b.local) b.local = nextLocal();
+    b.err = false;
+    renderAll();
+    toast(b.transport === 'ssh' ? '已启用 SSH 隧道' : '已改为直连');
+  });
+
+  $('#testBtn').addEventListener('click', testConnection);
+  $('#copyCmd').addEventListener('click', () => copyText(sshFor(current()), '已复制 SSH 命令'));
+  $('#copyBase').addEventListener('click', () => copyText(urlFor(current()), '已复制 API 地址'));
+
+  $('#eyeBtn').addEventListener('click', () => {
+    const input = $('#fKey');
+    const show = input.type === 'password';
+    input.type = show ? 'text' : 'password';
+    $('#eyeIcon').setAttribute('href', show ? '#i-eye-off' : '#i-eye');
+    $('#eyeBtn').setAttribute('aria-label', show ? '隐藏 API Key' : '显示 API Key');
+  });
+
+  $('#addBackend').addEventListener('click', addBackend);
+  $('#searchInput').addEventListener('input', renderList);
+  $('#settingsBtn').addEventListener('click', () => toast('全局设置会随主窗口一起实现'));
+  $('#popMaster').addEventListener('click', () => setAll(!backends.every((b) => b.enabled)));
+  $('#popOpen').addEventListener('click', () => setView('main'));
+  $('#popQuit').addEventListener('click', () => toast('退出并关闭所有隧道（示意）'));
+
+  $('#viewTabs').addEventListener('click', (e) => {
+    const btn = e.target.closest('button[data-view]');
+    if (btn) setView(btn.dataset.view);
+  });
+  $('#themeBtn').addEventListener('click', () => setTheme(state.theme === 'dark' ? 'light' : 'dark'));
+  window.addEventListener('resize', fit);
+
+  /* ---------- boot ---------- */
+  renderAll();
+  setTheme('light');
+  setView('main');
+  fit();
+})();
+</script>
+</body>
+</html>

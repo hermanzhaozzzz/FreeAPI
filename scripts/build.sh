@@ -12,7 +12,8 @@ app="build/FreeAPI.app"
 mkdir -p "$app/Contents/MacOS" "$app/Contents/Resources" build/bin
 for arch in "${architectures[@]}"; do
   xcrun swiftc -swift-version 5 -O -target "${arch}-apple-macos15.0" \
-    Sources/Configuration.swift Sources/main.swift -o "build/bin/FreeAPI-$arch"
+    Sources/*.swift -o "build/bin/FreeAPI-$arch" \
+    -framework AppKit -framework SwiftUI -framework Network -framework Security
 done
 if [[ "$architecture" == universal ]]; then
   xcrun lipo -create build/bin/FreeAPI-x86_64 build/bin/FreeAPI-arm64 -output "$app/Contents/MacOS/FreeAPI"
