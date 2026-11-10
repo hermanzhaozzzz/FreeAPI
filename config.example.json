@@ -1,0 +1,7 @@
+{
+  "sshDestination": "user@bastion.example.com",
+  "remoteHost": "api.internal.example.com",
+  "remotePort": 8189,
+  "localPort": 18189,
+  "apiPath": "/v1"
+}

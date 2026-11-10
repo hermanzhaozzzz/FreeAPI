@@ -1,0 +1,14 @@
+.DS_Store
+build/
+dist/
+config.json
+config.local.*
+.env
+.env.*
+!.env.example
+*.log
+*.key
+*.pem
+__pycache__/
+*.pyc
+.swift-module-cache/

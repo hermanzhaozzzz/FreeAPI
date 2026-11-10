@@ -1,0 +1,5 @@
+name: freeapi-reasoning-compat
+version: "0.1.0"
+description: "Preserve a single reasoning history field for FreeAPI DeepSeek; prevents duplicate-field HTTP 400."
+author: "Local FreeAPI configuration"
+kind: standalone
