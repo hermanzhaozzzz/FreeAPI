@@ -44,7 +44,7 @@ SSH 每 10 秒保活，连续 3 次无响应后断开；重试间隔逐步增加
 ~/Library/Mobile Documents/com~apple~CloudDocs/FreeAPI/config.json
 ```
 
-首次启动时，应用会创建这个文件夹，并把旧的 `~/Library/Application Support/FreeAPI/config.json` 复制过去；本机原文件保留为备份。如果本机副本比 iCloud 副本更新，会以本机修改时间较新的版本为准。之后修改停止约 1.5 秒后会原子写入 iCloud Drive，并同步到登录同一 iCloud 账户的其它 Mac；内容没有变化时跳过写入。每次实际保存会生成本机备份，最多保留 20 份。高级设置里的「配置备份」直接显示上次备份时间和可恢复列表，每份记录改动内容和时间；备份保存在 `~/Library/Application Support/FreeAPI/Backups`，不写入 iCloud。恢复前会先保存当前配置；API Key 在钥匙串，恢复配置不会带回已删除的 Key。应用每 8 秒检查一次文件变化，另一台设备改了配置后会自动载入。
+首次启动时，应用会创建这个文件夹，并把旧的 `~/Library/Application Support/FreeAPI/config.json` 复制过去；本机原文件保留为备份。如果本机副本比 iCloud 副本更新，会以本机修改时间较新的版本为准。之后修改停止约 1.5 秒后会原子写入 iCloud Drive，并同步到登录同一 iCloud 账户的其它 Mac；内容没有变化时跳过写入。每次实际保存会生成本机备份，最多保留 20 份；首次启动会先保存一份「初始配置」基线。高级设置里的「配置备份」直接显示上次备份时间和可恢复列表，每份记录改动内容和时间；备份保存在 `~/Library/Application Support/FreeAPI/Backups`，不写入 iCloud。恢复前会先保存当前配置；API Key 在钥匙串，恢复配置不会带回已删除的 Key。应用每 8 秒检查一次文件变化，另一台设备改了配置后会自动载入。
 
 如果 iCloud Drive 暂不可用，会自动回退到本机 `~/Library/Application Support/FreeAPI/config.json`。左下角齿轮打开「高级设置」：可以查看/切换配置位置、重新载入配置、打开配置文件夹，以及集中管理所有后端。
 
@@ -113,7 +113,7 @@ xcode-select --install    # 已安装则跳过
 ./scripts/package.sh arm64
 ```
 
-产物为 `build/FreeAPI.app` 和拖拽安装的 `dist/FreeAPI-2.2.0.dmg`。打开 DMG，把 FreeAPI 拖到 Applications，然后从应用程序文件夹启动。构建使用 ad-hoc 签名，未进行 Apple 公证。运行验证以作者的 Intel / macOS 15 环境为主；Apple Silicon 版本需要自行验证。
+产物为 `build/FreeAPI.app` 和拖拽安装的 `dist/FreeAPI-2.2.1.dmg`。打开 DMG，把 FreeAPI 拖到 Applications，然后从应用程序文件夹启动。构建使用 ad-hoc 签名，未进行 Apple 公证。运行验证以作者的 Intel / macOS 15 环境为主；Apple Silicon 版本需要自行验证。
 
 GitHub Actions 在 macOS 15 上运行 shellcheck、plist/JSON、Swift typecheck、配置/迁移和 guardian 清理测试，并构建 Universal 应用和 DMG。CI 不连接任何真实跳板机，也不需要密钥。
 

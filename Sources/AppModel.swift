@@ -75,6 +75,9 @@ final class AppModel: ObservableObject {
         lastKnownConfigData = ConfigurationStore.currentData()
         configLocationWarning = ConfigLocation.fallbackWarning
         backups = ConfigBackupStore.load()
+        if backups.isEmpty, !configuration.backends.isEmpty {
+            backups = ConfigBackupStore.add(configuration: configuration, summary: "初始配置")
+        }
     }
 
     // MARK: - Lifecycle
