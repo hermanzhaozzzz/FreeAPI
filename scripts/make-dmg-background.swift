@@ -99,7 +99,7 @@ func drawCentered(_ text: String, y: CGFloat, font: NSFont, color: NSColor) {
 
 drawCentered("FreeAPI", y: 350, font: .systemFont(ofSize: 26, weight: .semibold), color: ink)
 drawCentered("拖到 Applications 文件夹完成安装", y: 322, font: .systemFont(ofSize: 12), color: ink2)
-drawCentered("FreeAPI 2.0 · macOS 15+", y: 26, font: .systemFont(ofSize: 9, weight: .medium), color: ink3)
+drawCentered("FreeAPI · macOS 15+", y: 26, font: .systemFont(ofSize: 9, weight: .medium), color: ink3)
 
 let arrow = NSBezierPath()
 arrow.move(to: NSPoint(x: 250, y: height / 2))

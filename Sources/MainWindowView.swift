@@ -182,6 +182,24 @@ private struct SidebarView: View {
                 .buttonStyle(SecondaryButtonStyle())
 
                 Menu {
+                    Text("配置位置：\(model.configLocationLabel)")
+                    if !model.isUsingICloudConfig {
+                        Button("使用 iCloud Drive") {
+                            model.useICloudLocation()
+                        }
+                    }
+                    if !model.isUsingLocalConfig {
+                        Button("使用本机默认位置") {
+                            model.useLocalLocation()
+                        }
+                    }
+                    Button("选择其它文件夹…") {
+                        model.chooseConfigFolder()
+                    }
+                    Divider()
+                    Button("重新载入配置") {
+                        model.reloadConfiguration()
+                    }
                     Button("打开配置文件夹") {
                         ConfigurationStore.revealInFinder()
                     }

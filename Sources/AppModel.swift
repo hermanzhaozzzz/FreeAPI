@@ -14,6 +14,7 @@ final class AppModel: ObservableObject {
     @Published private(set) var startupError: String?
     @Published private(set) var isShuttingDown = false
     @Published private(set) var didMigrate = false
+    @Published private(set) var configLocationWarning: String?
 
     var onOpenWindow: ((UUID?) -> Void)?
 
@@ -32,6 +33,9 @@ final class AppModel: ObservableObject {
     private var started = false
     private var wakeObserver: NSObjectProtocol?
     private var lastPathSatisfied: Bool?
+    private var configWatchTimer: Timer?
+    private var lastKnownConfigData: Data?
+    private var isApplyingRemoteConfig = false
 
     init() {
         let sessionConfiguration = URLSessionConfiguration.ephemeral
@@ -47,7 +51,7 @@ final class AppModel: ObservableObject {
             configuration = loaded.configuration.sanitized()
             startupError = nil
             didMigrate = loaded.migrated
-            if loaded.migrated { try? ConfigurationStore.save(configuration) }
+            if loaded.migrated { _ = try? ConfigurationStore.save(configuration) }
         } catch let error as ConfigurationStoreError {
             configuration = AppConfiguration()
             if case .missing = error {
@@ -67,6 +71,8 @@ final class AppModel: ObservableObject {
             }
             runtimes[backend.id] = BackendRuntime()
         }
+        lastKnownConfigData = ConfigurationStore.currentData()
+        configLocationWarning = ConfigLocation.fallbackWarning
     }
 
     // MARK: - Lifecycle
@@ -76,9 +82,13 @@ final class AppModel: ObservableObject {
         started = true
         startNetworkMonitor()
         startHealthTimer()
+        startConfigWatcher()
         observeWake()
         for backend in configuration.backends where backend.enabled {
             startBackend(backend.id)
+        }
+        if let warning = configLocationWarning {
+            showToast(warning)
         }
     }
 
@@ -87,6 +97,8 @@ final class AppModel: ObservableObject {
         isShuttingDown = true
         healthTimer?.invalidate()
         healthTimer = nil
+        configWatchTimer?.invalidate()
+        configWatchTimer = nil
         monitor.cancel()
         if let wakeObserver {
             NSWorkspace.shared.notificationCenter.removeObserver(wakeObserver)
@@ -359,7 +371,8 @@ final class AppModel: ObservableObject {
         }
     }
 
-    func addBackend() {        let used = Set(configuration.backends.compactMap(\.localPort))
+    func addBackend() {
+        let used = Set(configuration.backends.compactMap(\.localPort))
         let port = PortChecker.nextAvailable(startingAt: 18189, excluding: used)
         let backend = Backend(
             name: "新后端 \(configuration.backends.count + 1)",
@@ -410,11 +423,153 @@ final class AppModel: ObservableObject {
         DispatchQueue.main.asyncAfter(deadline: .now() + 2.6, execute: work)
     }
 
-    func saveNow() {
+    // MARK: - Configuration location
+
+    var configLocationLabel: String { ConfigLocation.displayName }
+    var isUsingICloudConfig: Bool { ConfigLocation.isUsingICloud }
+    var isUsingLocalConfig: Bool { ConfigLocation.isUsingLocal }
+
+    func useICloudLocation() {
+        switchConfigLocation(loadExisting: true) { try ConfigLocation.useICloud() }
+    }
+
+    func useLocalLocation() {
+        switchConfigLocation(loadExisting: false) { ConfigLocation.useLocal() }
+    }
+
+    func chooseConfigFolder() {
+        let panel = NSOpenPanel()
+        panel.canChooseDirectories = true
+        panel.canChooseFiles = false
+        panel.canCreateDirectories = true
+        panel.allowsMultipleSelection = false
+        panel.prompt = "使用此文件夹"
+        panel.message = "选择保存 FreeAPI 配置的文件夹。选择 iCloud Drive 中的文件夹可多端同步。"
+        panel.directoryURL = ConfigLocation.activeDirectory
+        NSApp.activate(ignoringOtherApps: true)
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        switchConfigLocation(loadExisting: true) { try ConfigLocation.setCustomFolder(url) }
+    }
+
+    func reloadConfiguration() {
+        do {
+            let loaded = try ConfigurationStore.load()
+            applyLoadedConfiguration(loaded.configuration)
+            lastKnownConfigData = ConfigurationStore.currentData()
+            if loaded.migrated { saveNow() }
+            showToast("已重新载入配置")
+        } catch {
+            showToast("重新载入失败：\(error.localizedDescription)")
+        }
+    }
+
+    private func switchConfigLocation(loadExisting: Bool, _ action: () throws -> Void) {
+        let snapshot = ConfigLocation.snapshot()
+        do {
+            try action()
+        } catch {
+            ConfigLocation.restore(snapshot)
+            showToast(error.localizedDescription)
+            return
+        }
+
+        let target = ConfigurationStore.fileURL
+        if loadExisting, FileManager.default.fileExists(atPath: target.path) {
+            do {
+                let loaded = try ConfigurationStore.load()
+                applyLoadedConfiguration(loaded.configuration)
+                lastKnownConfigData = ConfigurationStore.currentData()
+                if loaded.migrated { saveNow() }
+                showToast("已载入 \(ConfigLocation.displayName) 的配置")
+            } catch {
+                ConfigLocation.restore(snapshot)
+                showToast("载入失败：\(error.localizedDescription)")
+            }
+        } else {
+            do {
+                try persistNow()
+                showToast("配置已保存到 \(ConfigLocation.displayName)，之后会实时同步")
+            } catch {
+                ConfigLocation.restore(snapshot)
+                showToast("保存失败：\(error.localizedDescription)")
+            }
+        }
+    }
+
+    private func applyLoadedConfiguration(_ loaded: AppConfiguration) {
+        isApplyingRemoteConfig = true
+        defer { isApplyingRemoteConfig = false }
+
+        for backend in configuration.backends {
+            stopBackend(backend.id)
+        }
+        for (id, work) in editTasks {
+            work.cancel()
+            editTasks[id] = nil
+        }
+        for (id, work) in retryTasks {
+            work.cancel()
+            retryTasks[id] = nil
+        }
+
+        let sanitized = loaded.sanitized()
+        configuration = sanitized
+        selectedID = sanitized.backends.first?.id
+
+        var newRuntimes: [UUID: BackendRuntime] = [:]
+        var newKeys: [UUID: String] = [:]
+        for backend in sanitized.backends {
+            newRuntimes[backend.id] = BackendRuntime()
+            if let key = KeychainStore.read(account: backend.id.uuidString) {
+                newKeys[backend.id] = key
+            }
+        }
+        runtimes = newRuntimes
+        apiKeys = newKeys
+
+        for backend in sanitized.backends where backend.enabled {
+            startBackend(backend.id)
+        }
+    }
+
+    private func startConfigWatcher() {
+        let timer = Timer(timeInterval: 8, repeats: true) { [weak self] _ in
+            self?.pollConfigFile()
+        }
+        RunLoop.main.add(timer, forMode: .common)
+        configWatchTimer = timer
+    }
+
+    private func pollConfigFile() {
+        guard !isShuttingDown, saveTask == nil, !isApplyingRemoteConfig else { return }
+        let known = lastKnownConfigData
+        DispatchQueue.global(qos: .utility).async {
+            guard let data = ConfigurationStore.currentData(),
+                  data != known,
+                  let decoded = try? ConfigurationStore.decode(data) else { return }
+            DispatchQueue.main.async { [weak self] in
+                guard let self,
+                      !self.isShuttingDown,
+                      self.saveTask == nil,
+                      !self.isApplyingRemoteConfig,
+                      data != self.lastKnownConfigData else { return }
+                self.applyLoadedConfiguration(decoded)
+                self.lastKnownConfigData = data
+                self.showToast("已载入同步文件夹中的新配置")
+            }
+        }
+    }
+
+    private func persistNow() throws {
         let sanitized = configuration.sanitized()
         configuration = sanitized
+        let data = try ConfigurationStore.save(sanitized)
+        lastKnownConfigData = data
+    }
+
+    func saveNow() {
         do {
-            try ConfigurationStore.save(sanitized)
+            try persistNow()
         } catch {
             showToast("保存失败：\(error.localizedDescription)")
         }
@@ -621,7 +776,10 @@ final class AppModel: ObservableObject {
 
     private func scheduleSave() {
         saveTask?.cancel()
-        let work = DispatchWorkItem { [weak self] in self?.saveNow() }
+        let work = DispatchWorkItem { [weak self] in
+            self?.saveTask = nil
+            self?.saveNow()
+        }
         saveTask = work
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.4, execute: work)
     }

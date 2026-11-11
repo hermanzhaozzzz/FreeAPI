@@ -1,6 +1,19 @@
 import Foundation
+import Darwin
 
 setbuf(stdout, nil)
+
+let syncTestRoot = NSTemporaryDirectory() + "freeapi-config-store-\(ProcessInfo.processInfo.processIdentifier)"
+let syncLocalDir = syncTestRoot + "/local"
+let syncCloudRoot = syncTestRoot + "/icloud"
+let syncCloudDir = syncCloudRoot + "/FreeAPI"
+unsetenv("FREEAPI_CONFIG_DIR")
+setenv("FREEAPI_LOCAL_DIR", syncLocalDir, 1)
+setenv("FREEAPI_ICLOUD_DIR", syncCloudDir, 1)
+setenv("FREEAPI_FORCE_ICLOUD", "1", 1)
+let syncFileManager = FileManager.default
+try? syncFileManager.createDirectory(atPath: syncCloudRoot, withIntermediateDirectories: true)
+try? syncFileManager.createDirectory(atPath: syncLocalDir, withIntermediateDirectories: true)
 
 var failures = 0
 
@@ -146,6 +159,49 @@ let original = AppConfiguration(mode: .single, backends: [ssh, direct])
 let encoded = try! JSONEncoder().encode(original)
 let decoded = try! JSONDecoder().decode(AppConfiguration.self, from: encoded)
 check(decoded == original, "v2 配置往返")
+
+// MARK: - config store / iCloud migration
+
+let syncSeed = Backend(
+    name: "同步测试",
+    transport: .direct,
+    scheme: "https",
+    host: "api.example.com",
+    port: 443,
+    apiPath: "/v1",
+    localPort: nil,
+    sshTarget: "",
+    enabled: false
+)
+let syncEncoder = JSONEncoder()
+syncEncoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+try! syncEncoder.encode(AppConfiguration(backends: [syncSeed]))
+    .write(to: URL(fileURLWithPath: syncLocalDir + "/config.json"))
+
+do {
+    let loaded = try ConfigurationStore.load()
+    check(loaded.configuration.backends.first?.name == "同步测试", "本机配置迁移到 iCloud")
+    check(ConfigLocation.isUsingICloud, "当前使用 iCloud 位置")
+    let cloudURL = URL(fileURLWithPath: syncCloudDir + "/config.json")
+    check(syncFileManager.fileExists(atPath: cloudURL.path), "iCloud 配置文件已创建")
+    check(syncFileManager.fileExists(atPath: syncLocalDir + "/config.json"), "本机配置保留为备份")
+} catch {
+    check(false, "iCloud 配置迁移失败：\(error.localizedDescription)")
+}
+
+do {
+    var changed = try ConfigurationStore.load().configuration
+    changed.backends[0].name = "同步已保存"
+    let data = try ConfigurationStore.save(changed)
+    check(!data.isEmpty, "iCloud 保存返回数据")
+    let reopened = try ConfigurationStore.load()
+    check(reopened.configuration.backends.first?.name == "同步已保存", "iCloud 保存后重新读取")
+    check(ConfigurationStore.currentData() != nil, "iCloud 当前配置数据可读")
+} catch {
+    check(false, "iCloud 保存测试失败：\(error.localizedDescription)")
+}
+
+try? syncFileManager.removeItem(atPath: syncTestRoot)
 
 if failures > 0 {
     fatalError("\(failures) model test(s) failed")

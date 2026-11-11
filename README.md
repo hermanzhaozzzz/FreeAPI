@@ -34,23 +34,31 @@
 
 SSH 每 10 秒保活，连续 3 次无响应后断开；重试间隔逐步增加到 15 秒。每 15 秒检查一次 `/models`，连续两次网络失败会自动重建隧道；监听网络恢复和系统唤醒。正常退出或强制退出时，看护进程会清理 SSH 子进程。
 
-## 配置
+## 配置与 iCloud 同步
 
 需要 macOS 15 或更新版本，以及已经可以非交互登录的 SSH 密钥或 ssh-agent。先用终端连接自己的跳板机，确认主机指纹并完成首次登录。应用启用严格主机密钥检查和 `BatchMode`，不弹出密码输入框。
 
-配置保存在本机：
+配置默认保存在 iCloud Drive：
 
 ```text
-~/Library/Application Support/FreeAPI/config.json
+~/Library/Mobile Documents/com~apple~CloudDocs/FreeAPI/config.json
 ```
+
+首次启动时，应用会创建这个文件夹，并把旧的 `~/Library/Application Support/FreeAPI/config.json` 复制过去；本机原文件保留为备份。之后每次修改会在约 0.4 秒内原子写入 iCloud Drive，并同步到登录同一 iCloud 账户的其它 Mac。应用每 8 秒检查一次文件变化，另一台设备改了配置后会自动载入。
+
+如果 iCloud Drive 暂不可用，会自动回退到本机 `~/Library/Application Support/FreeAPI/config.json`。主窗口左下角的齿轮菜单可以查看当前配置位置、切换 iCloud Drive / 本机默认位置、选择其它文件夹、重新载入配置，或打开配置文件夹。
+
+多端同时修改时采用最后写入覆盖；iCloud 产生的冲突副本不会自动合并。
 
 通常不需要手写：在主窗口点「添加后端」填写即可。想手动准备时，可以复制示例：
 
 ```bash
-mkdir -p "$HOME/Library/Application Support/FreeAPI"
-cp config.example.json "$HOME/Library/Application Support/FreeAPI/config.json"
-chmod 600 "$HOME/Library/Application Support/FreeAPI/config.json"
+mkdir -p "$HOME/Library/Mobile Documents/com~apple~CloudDocs/FreeAPI"
+cp config.example.json "$HOME/Library/Mobile Documents/com~apple~CloudDocs/FreeAPI/config.json"
+chmod 600 "$HOME/Library/Mobile Documents/com~apple~CloudDocs/FreeAPI/config.json"
 ```
+
+如果使用本机位置，把上面的路径换成 `~/Library/Application Support/FreeAPI`。
 
 示例字段：
 
@@ -82,9 +90,9 @@ chmod 600 "$HOME/Library/Application Support/FreeAPI/config.json"
 - `sshTarget`：SSH 的 `user@host` 或 `~/.ssh/config` 中的 Host 别名。端口、密钥和 ProxyJump 可放在 SSH 配置里。
 - 直连后端使用 `scheme`（`http` 或 `https`），SSH 后端的本机入口固定为 `http://127.0.0.1:<localPort>`。
 
-旧版单隧道配置（`sshDestination` / `remoteHost` / `remotePort` / `localPort` / `apiPath`）会在启动时自动迁移成一个 SSH 后端，并备份为 `config.v1.backup.json`。
+旧版单隧道配置（`sshDestination` / `remoteHost` / `remotePort` / `localPort` / `apiPath`）会在启动时自动迁移成一个 SSH 后端，并在当前配置位置备份为 `config.v1.backup.json`。
 
-API Key 保存在 macOS 钥匙串，不写入 `config.json`，也不出现在连接日志里。它用于应用自己的连通性测试（`Authorization: Bearer`），不会替客户端添加鉴权头；客户端仍需填写自己的 Key。
+API Key 保存在 macOS 钥匙串，不写入 `config.json`，也不出现在连接日志里。优先使用可随 iCloud 钥匙串同步的条目；读取旧的仅本机 Key 时会尝试创建同步副本。开启 iCloud 钥匙串后，多台 Mac 可以共用 Key；未开启时 Key 只在本机。它用于应用自己的连通性测试（`Authorization: Bearer`），不会替客户端添加鉴权头；客户端仍需填写自己的 Key。
 
 绿色状态包含 HTTP 200、401 和 403：表示 HTTP 接口可达，不代表模型鉴权或生成请求已经成功。SSH 隧道转发的是 TCP，应用不做 TLS 终止；经 SSH 转发时请使用 HTTP 上游，HTTPS 上游请用直连或自行在跳板机侧处理证书。
 
@@ -105,7 +113,7 @@ xcode-select --install    # 已安装则跳过
 ./scripts/package.sh arm64
 ```
 
-产物为 `build/FreeAPI.app` 和拖拽安装的 `dist/FreeAPI-2.0.0.dmg`。打开 DMG，把 FreeAPI 拖到 Applications，然后从应用程序文件夹启动。构建使用 ad-hoc 签名，未进行 Apple 公证。运行验证以作者的 Intel / macOS 15 环境为主；Apple Silicon 版本需要自行验证。
+产物为 `build/FreeAPI.app` 和拖拽安装的 `dist/FreeAPI-2.1.0.dmg`。打开 DMG，把 FreeAPI 拖到 Applications，然后从应用程序文件夹启动。构建使用 ad-hoc 签名，未进行 Apple 公证。运行验证以作者的 Intel / macOS 15 环境为主；Apple Silicon 版本需要自行验证。
 
 GitHub Actions 运行配置和进程清理测试，并构建 Universal 应用和 DMG。CI 不连接任何真实跳板机，也不需要密钥。
 
@@ -137,7 +145,7 @@ Claude Code / Claude Desktop 使用 Anthropic 协议；如果上游只有 OpenAI
 
 ## 卸载
 
-从菜单选择「退出并关闭隧道」，然后把 FreeAPI 从应用程序文件夹拖到废纸篓。本机配置目录 `~/Library/Application Support/FreeAPI`、钥匙串中的 `local.freeapi.apikey` 条目和下载的 DMG 可按需删除。没有系统后台服务需要卸载。Hermes 插件需按其独立说明移除。
+从菜单选择「退出并关闭隧道」，然后把 FreeAPI 从应用程序文件夹拖到废纸篓。iCloud Drive 中的 `FreeAPI` 文件夹、本机配置目录 `~/Library/Application Support/FreeAPI`、钥匙串中的 `local.freeapi.apikey` 条目和下载的 DMG 可按需删除。没有系统后台服务需要卸载。Hermes 插件需按其独立说明移除。
 
 ## 仓库边界
 
