@@ -84,6 +84,15 @@ check(emptyPath.healthURL == "http://127.0.0.1:18189/models", "空路径健康�
 check((try? ssh.validated()) != nil, "合法 SSH 配置")
 check((try? direct.validated()) != nil, "合法直连配置")
 
+let parsedDomain = ServiceAddress.parse("api.deepseek.com")
+check(parsedDomain?.scheme == "https", "地址解析默认 https")
+check(parsedDomain?.port == 443, "地址解析默认端口")
+check(parsedDomain?.path == "/v1", "地址解析默认路径")
+let parsedHTTP = ServiceAddress.parse("http://11.250.1.209:8189")
+check(parsedHTTP?.scheme == "http", "地址解析保留 http")
+check(parsedHTTP?.port == 8189, "地址解析保留端口")
+check(ServiceAddress.parse("") == nil, "拒绝空地址")
+
 var badTarget = ssh
 badTarget.sshTarget = "-oProxyCommand=bad"
 check((try? badTarget.validated()) == nil, "拒绝参数注入的 SSH 目标")

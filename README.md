@@ -12,7 +12,7 @@
 客户端 → 127.0.0.1:18189 → SSH 跳板机 → 模型 API
 ```
 
-视觉稿见 [`design/freeapi-redesign.html`](design/freeapi-redesign.html)，原生界面按 Claude 暖米色 + 陶土橙的玻璃风格实现。
+视觉稿见 [`design/freeapi-ux.html`](design/freeapi-ux.html)，原生界面按 LiquidBar 的平面主题实现：Claude 暖米色、陶土橙、纯色卡片和 1px 边框，不使用渐变或玻璃效果。
 
 ## 使用方式
 
@@ -27,7 +27,9 @@
 
 **菜单栏弹层**：总开关、已连接计数、并行/单路模式、每个后端的开关/延迟/复制地址，以及打开主窗口和退出。
 
-**主窗口**：左侧后端列表与搜索；右侧编辑名称、服务器地址、端口、协议、API 路径、本地端口、API Key 和 SSH 目标。SSH 拨杆关闭即直连，打开后自动生成 SSH 命令并可复制。底栏显示客户端应使用的 Base URL。左下角齿轮打开「高级设置」：集中添加 SSH 或直连后端、启停、编辑和删除，查看/恢复配置备份；单个后端详情不再提供删除入口。
+**主窗口**：左侧是服务列表和搜索，底部 `+`、`−`、电源三个按钮分别添加、删除、启停光标所在的服务；按住 Shift 点击可以连续多选，批量删除或启停。右侧详情可以改名，查看连接摘要，点「编辑」修改 API 地址；打开「经跳板机」后填写跳板机目标、调整本地端口并复制生成的 SSH 命令。API Key 单独保存在钥匙串。底栏显示客户端应使用的 Base URL，可一键复制。左下角齿轮打开「设置」：配置位置、备份与恢复、运行模式。
+
+**添加服务**：点 `+` 粘贴 API 地址即可，路径会自动识别；没有写路径时默认 `/v1`。添加时只选择直连，跳板机、本地端口这些高级选项在服务详情的「连接」里再打开，避免一开始就做不必要的选择。
 
 **运行模式**：
 
@@ -46,13 +48,13 @@ SSH 每 10 秒保活，连续 3 次无响应后断开；重试间隔逐步增加
 ~/Library/Mobile Documents/com~apple~CloudDocs/FreeAPI/config.json
 ```
 
-首次启动时，应用会创建这个文件夹，并把旧的 `~/Library/Application Support/FreeAPI/config.json` 复制过去；本机原文件保留为备份。如果本机副本比 iCloud 副本更新，会以本机修改时间较新的版本为准。之后修改停止约 1.5 秒后会原子写入 iCloud Drive，并同步到登录同一 iCloud 账户的其它 Mac；内容没有变化时跳过写入。每次实际保存会生成本机备份，最多保留 20 份；首次启动会先保存一份「初始配置」基线。高级设置里的「配置备份」直接显示上次备份时间和可恢复列表，每份记录改动内容和时间；备份保存在 `~/Library/Application Support/FreeAPI/Backups`，不写入 iCloud。恢复前会先保存当前配置；API Key 在钥匙串，恢复配置不会带回已删除的 Key。应用每 8 秒检查一次文件变化，另一台设备改了配置后会自动载入。
+首次启动时，应用会创建这个文件夹，并把旧的 `~/Library/Application Support/FreeAPI/config.json` 复制过去；本机原文件保留为备份。如果本机副本比 iCloud 副本更新，会以本机修改时间较新的版本为准。之后修改停止约 1.5 秒后会原子写入 iCloud Drive，并同步到登录同一 iCloud 账户的其它 Mac；内容没有变化时跳过写入。每次实际保存会生成本机备份，最多保留 20 份；首次启动会先保存一份「初始配置」基线。设置里的「配置备份」直接显示上次备份时间和可恢复列表，每份记录改动内容和时间；备份保存在 `~/Library/Application Support/FreeAPI/Backups`，不写入 iCloud。恢复前会先保存当前配置；API Key 在钥匙串，恢复配置不会带回已删除的 Key。应用每 8 秒检查一次文件变化，另一台设备改了配置后会自动载入。
 
-如果 iCloud Drive 暂不可用，会自动回退到本机 `~/Library/Application Support/FreeAPI/config.json`。左下角齿轮打开「高级设置」：可以查看/切换配置位置、重新载入配置、打开配置文件夹，以及集中管理所有后端。
+如果 iCloud Drive 暂不可用，会自动回退到本机 `~/Library/Application Support/FreeAPI/config.json`。左下角齿轮打开「设置」：可以查看/切换配置位置、重新载入配置、打开配置文件夹，以及查看/恢复备份和切换运行模式。
 
 多端同时修改时采用最后写入覆盖；iCloud 产生的冲突副本不会自动合并。
 
-通常不需要手写：在高级设置里点「添加 SSH」或「添加直连」填写即可。想手动准备时，可以复制示例：
+通常不需要手写：在主窗口左下角点 `+` 粘贴 API 地址即可；需要跳板机时再到服务详情里打开。想手动准备时，可以复制示例：
 
 ```bash
 mkdir -p "$HOME/Library/Mobile Documents/com~apple~CloudDocs/FreeAPI"
@@ -115,7 +117,7 @@ xcode-select --install    # 已安装则跳过
 ./scripts/package.sh arm64
 ```
 
-产物为 `build/FreeAPI.app` 和拖拽安装的 `dist/FreeAPI-2.2.1.dmg`。打开 DMG，把 FreeAPI 拖到 Applications，然后从应用程序文件夹启动。构建使用 ad-hoc 签名，未进行 Apple 公证。运行验证以作者的 Intel / macOS 15 环境为主；Apple Silicon 版本需要自行验证。
+产物为 `build/FreeAPI.app` 和拖拽安装的 `dist/FreeAPI-3.0.0.dmg`。打开 DMG，把 FreeAPI 拖到 Applications，然后从应用程序文件夹启动。构建使用 ad-hoc 签名，未进行 Apple 公证。运行验证以作者的 Intel / macOS 15 环境为主；Apple Silicon 版本需要自行验证。
 
 GitHub Actions 在 macOS 15 上运行 shellcheck、plist/JSON、Swift typecheck、配置/迁移和 guardian 清理测试，并构建 Universal 应用和 DMG。CI 不连接任何真实跳板机，也不需要密钥。
 

@@ -1,0 +1,1169 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>FreeAPI · 使用流程重设计</title>
+<style>
+:root {
+  color-scheme: light;
+  --font-ui: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "PingFang SC", "Helvetica Neue", sans-serif;
+  --font-serif: ui-serif, "New York", "Iowan Old Style", Georgia, "Songti SC", serif;
+  --font-mono: ui-monospace, "SF Mono", "SFMono-Regular", Menlo, monospace;
+  --font-num: ui-rounded, "SF Pro Rounded", -apple-system, sans-serif;
+
+  --canvas: #F7F5EF;
+  --surface: #FDFCF8;
+  --surface-muted: #F0EDE3;
+  --surface-strong: #E9E5D9;
+  --border: #E3DFD2;
+
+  --ink: #23211D;
+  --ink2: #6F6A60;
+  --ink3: #99948A;
+  --accent: #C2603F;
+  --accent2: #D97757;
+  --accent-fill: #D97757;
+  --accent-soft: #F6E4DB;
+  --on-accent: #FFF9F5;
+  --ok: #2F6F5E;
+  --ok-ink: #2F6F5E;
+  --warn: #A9611F;
+  --warn-ink: #A9611F;
+  --bad: #A83224;
+  --bad-ink: #A83224;
+
+  --hairline: #E3DFD2;
+  --hairline-strong: #D8D2C3;
+  --glass-fill: #FDFCF8;
+  --glass-fill-2: #FDFCF8;
+  --glass-stroke: #E3DFD2;
+  --glass-stroke-2: #E3DFD2;
+  --well: #F0EDE3;
+  --input-bg: #FDFCF8;
+  --row-hover: #F2EFE6;
+  --row-sel: #F6E4DB;
+  --seg-bg: #F0EDE3;
+  --seg-thumb: #FDFCF8;
+  --code-bg: #F0EDE3;
+  --shadow: 0 24px 60px -30px rgba(35, 33, 29, .25);
+  --shadow-sheet: 0 30px 70px -30px rgba(35, 33, 29, .3);
+}
+
+[data-theme="dark"] {
+  color-scheme: dark;
+  --canvas: #1A1917;
+  --surface: #24221F;
+  --surface-muted: #2C2A26;
+  --surface-strong: #35322D;
+  --border: #3A3731;
+
+  --ink: #F1EEE5;
+  --ink2: #ACA79C;
+  --ink3: #807B71;
+  --accent: #E08A6B;
+  --accent2: #D97757;
+  --accent-fill: #D97757;
+  --accent-soft: #3B2C26;
+  --on-accent: #FFF9F5;
+  --ok: #7CC3A7;
+  --ok-ink: #7CC3A7;
+  --warn: #E5AE6B;
+  --warn-ink: #E5AE6B;
+  --bad: #F0806A;
+  --bad-ink: #F0806A;
+
+  --hairline: #3A3731;
+  --hairline-strong: #4A463E;
+  --glass-fill: #24221F;
+  --glass-fill-2: #24221F;
+  --glass-stroke: #3A3731;
+  --glass-stroke-2: #3A3731;
+  --well: #2C2A26;
+  --input-bg: #24221F;
+  --row-hover: #2C2A26;
+  --row-sel: #3B2C26;
+  --seg-bg: #2C2A26;
+  --seg-thumb: #35322D;
+  --code-bg: #2C2A26;
+  --shadow: 0 24px 60px -30px rgba(0, 0, 0, .5);
+  --shadow-sheet: 0 30px 70px -30px rgba(0, 0, 0, .55);
+}
+
+* { box-sizing: border-box; }
+html, body { height: 100%; }
+body {
+  margin: 0;
+  font-family: var(--font-ui);
+  color: var(--ink);
+  background: var(--canvas);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  overflow-x: hidden;
+}
+button, input, textarea { font: inherit; color: inherit; }
+button { cursor: pointer; }
+:focus-visible { outline: 2px solid color-mix(in srgb, var(--accent) 70%, white); outline-offset: 2px; }
+
+.i { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+.i.sm { width: 13px; height: 13px; }
+
+/* flat canvas, matching LiquidBar */
+
+/* demo bar */
+.demo-bar {
+  position: relative; z-index: 8;
+  display: flex; align-items: center; justify-content: space-between; gap: 18px;
+  padding: 12px 22px;
+  border-bottom: 1px solid var(--hairline);
+  background: var(--canvas);
+  border-bottom: 1px solid var(--border);
+}
+.demo-title { display: flex; align-items: center; gap: 10px; font-size: 12px; font-weight: 600; color: var(--ink2); }
+.demo-title .mark {
+  width: 22px; height: 22px; border-radius: 7px; display: grid; place-items: center;
+  color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 16%, transparent);
+}
+.demo-title .ver { font-size: 10.5px; font-weight: 500; color: var(--ink3); padding: 2px 7px; border-radius: 999px; border: 1px solid var(--hairline-strong); }
+.demo-actions { display: flex; align-items: center; gap: 10px; }
+.demo-hint { font-size: 11px; color: var(--ink3); }
+
+.seg { display: inline-flex; padding: 2px; gap: 2px; border-radius: 9px; background: var(--seg-bg); border: 1px solid var(--border); }
+.seg button { border: 0; background: transparent; color: var(--ink2); font-size: 11.5px; font-weight: 600; padding: 4px 11px; border-radius: 7px; transition: .18s; }
+.seg button:hover { color: var(--ink); }
+.seg button.on { color: var(--ink); background: var(--seg-thumb); box-shadow: 0 1px 2px rgba(35, 33, 29, .08); }
+
+.icon-btn {
+  width: 30px; height: 30px; display: inline-grid; place-items: center;
+  border-radius: 9px; border: 1px solid var(--glass-stroke-2);
+  background: var(--input-bg); color: var(--ink2);
+}
+.icon-btn:hover { color: var(--ink); }
+
+/* glass */
+.glass {
+  position: relative; isolation: isolate;
+  background: var(--surface);
+  border: 1px solid var(--border);
+}
+.glass::before { display: none; }
+.glass > * { position: relative; z-index: 1; }
+
+/* stage */
+.stage { position: relative; z-index: 2; display: grid; place-items: start center; min-height: calc(100vh - 55px); padding: 30px 24px 60px; }
+.surface { width: 1040px; height: 700px; position: relative; flex: none; zoom: 1; }
+.app-window {
+  width: 1040px; height: 700px;
+  display: grid; grid-template-columns: 280px 1fr;
+  border-radius: 16px; overflow: hidden;
+  background: var(--canvas);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow);
+}
+
+.traffic { position: absolute; top: 17px; left: 19px; display: flex; gap: 8px; z-index: 4; }
+.traffic i { width: 12px; height: 12px; border-radius: 50%; display: block; }
+.traffic i:nth-child(1) { background: #ff5f57; }
+.traffic i:nth-child(2) { background: #febc2e; }
+.traffic i:nth-child(3) { background: #28c840; }
+
+/* sidebar */
+.sidebar {
+  display: flex; flex-direction: column; min-height: 0;
+  padding: 52px 12px 12px;
+  border-right: 1px solid var(--border);
+  background: var(--canvas);
+}
+.brand { display: flex; align-items: center; gap: 9px; padding: 0 8px; }
+.brand-logo {
+  width: 26px; height: 26px; border-radius: 8px; display: grid; place-items: center;
+  color: var(--accent);
+  background: var(--accent-soft);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 18%, transparent);
+}
+.brand-name { font-family: var(--font-serif); font-size: 16px; font-weight: 600; letter-spacing: -.01em; }
+.brand-ver { font-size: 9.5px; color: var(--ink3); font-weight: 500; }
+
+.search { position: relative; margin: 16px 6px 0; }
+.search .i { position: absolute; left: 9px; top: 50%; transform: translateY(-50%); color: var(--ink3); }
+.search input {
+  width: 100%; height: 30px; padding: 0 10px 0 28px;
+  border: 1px solid var(--glass-stroke-2); border-radius: 9px;
+  background: var(--input-bg); color: var(--ink); font-size: 11.5px;
+}
+.search input::placeholder { color: var(--ink3); }
+
+.list-head { display: flex; align-items: center; gap: 7px; padding: 16px 10px 7px; }
+.list-head > span:first-child { font-size: 10px; font-weight: 650; color: var(--ink3); letter-spacing: .02em; }
+.list-count { font-size: 9px; font-weight: 700; color: var(--ink3); min-width: 15px; height: 15px; padding: 0 4px; border-radius: 999px; display: inline-grid; place-items: center; background: color-mix(in srgb, var(--ink3) 13%, transparent); }
+.list-head .manage-link { margin-left: auto; font-size: 9.5px; color: var(--accent); background: none; border: 0; padding: 2px 4px; border-radius: 5px; }
+.list-head .manage-link:hover { background: color-mix(in srgb, var(--accent) 9%, transparent); }
+
+.service-list { flex: 1; min-height: 0; overflow: auto; padding: 0 2px 4px; scrollbar-width: none; }
+.service-list::-webkit-scrollbar { display: none; }
+.row {
+  display: grid; grid-template-columns: 14px 1fr; grid-template-rows: auto auto;
+  column-gap: 9px; row-gap: 2px; align-items: center;
+  padding: 8px 9px 8px 10px; margin-bottom: 2px;
+  border-radius: 9px; border: 1px solid transparent;
+  transition: background .16s, border-color .16s;
+  user-select: none;
+}
+.row:hover { background: var(--row-hover); }
+.row.sel { background: var(--accent-soft); border-color: color-mix(in srgb, var(--accent) 16%, transparent); }
+.row.sel .row-name { color: var(--accent); }
+.row.primary { border-color: color-mix(in srgb, var(--accent) 42%, transparent); box-shadow: inset 3px 0 0 var(--accent); }
+.row .node { grid-row: 1 / 3; align-self: center; display: grid; place-items: center; width: 14px; }
+.row-name { font-size: 12px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.row-sub { grid-column: 2; display: flex; align-items: center; gap: 7px; min-width: 0; font-size: 10px; color: var(--ink3); }
+.row-sub .addr { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 9.5px; }
+.row-sub .ms { margin-left: auto; font-size: 9.5px; white-space: nowrap; }
+.row-sub .ms.ok { color: var(--ok-ink); }
+.row-sub .ms.err { color: var(--bad-ink); }
+.row-sub .ms.warn { color: var(--warn-ink); }
+.row-sub .ms.off { color: var(--ink3); }
+.list-empty { margin: 18px 8px; font-size: 10.5px; line-height: 1.5; color: var(--ink3); text-align: center; }
+
+.sidebar-foot { display: flex; flex-direction: column; gap: 6px; padding: 8px 4px 0; border-top: 1px solid var(--border); margin-top: 4px; }
+.action-row { display: flex; align-items: center; gap: 6px; }
+.action-row .icon-btn { width: 30px; height: 30px; }
+.icon-btn.add-icon { color: var(--on-accent); background: var(--accent-fill); border-color: transparent; }
+.icon-btn:disabled { opacity: .35; cursor: default; }
+.settings-btn { width: 30px; height: 30px; margin-left: auto; }
+
+/* controls */
+.switch { position: relative; width: 38px; height: 22px; flex: none; border: 0; background: transparent; padding: 0; border-radius: 999px; }
+.switch.sm { width: 32px; height: 18px; }
+.switch .track { position: absolute; inset: 0; border-radius: 999px; background: var(--surface-strong); transition: background .22s; }
+.switch .thumb { position: absolute; top: 2px; left: 2px; width: 18px; height: 18px; border-radius: 50%; background: #fffdf8; box-shadow: 0 1px 3px rgba(72,50,30,.28); transition: transform .22s cubic-bezier(.2,.8,.3,1); }
+.switch.sm .thumb { width: 14px; height: 14px; }
+.switch.on .track { background: var(--ok); }
+.switch.on .thumb { transform: translateX(16px); }
+.switch.sm.on .thumb { transform: translateX(14px); }
+[data-theme="dark"] .switch .track { background: rgba(255,255,255,.18); }
+
+.dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; background: var(--ink3); flex: none; }
+.dot.ok { background: var(--ok); box-shadow: 0 0 0 3px color-mix(in srgb, var(--ok) 18%, transparent); }
+.dot.warn { background: var(--warn); box-shadow: 0 0 0 3px color-mix(in srgb, var(--warn) 16%, transparent); }
+.dot.err { background: var(--bad); box-shadow: 0 0 0 3px color-mix(in srgb, var(--bad) 17%, transparent); }
+.dot.off { background: color-mix(in srgb, var(--ink3) 65%, transparent); box-shadow: none; }
+
+.chip { display: inline-flex; align-items: center; gap: 5px; height: 20px; padding: 0 8px; border-radius: 999px; font-size: 10.5px; font-weight: 650; white-space: nowrap; }
+.chip .dot { width: 6px; height: 6px; box-shadow: none; }
+.chip.ok { color: var(--ok-ink); background: color-mix(in srgb, var(--ok) 13%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ok) 18%, transparent); }
+.chip.off { color: var(--ink3); background: color-mix(in srgb, var(--ink3) 12%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ink3) 14%, transparent); }
+.chip.warn { color: var(--warn-ink); background: color-mix(in srgb, var(--warn) 13%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--warn) 18%, transparent); }
+.chip.err { color: var(--bad-ink); background: color-mix(in srgb, var(--bad) 12%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--bad) 18%, transparent); }
+.tag { font-size: 9px; font-weight: 700; letter-spacing: .03em; padding: 1.5px 5px; border-radius: 4.5px; flex: none; }
+.tag.ssh { color: var(--accent); background: color-mix(in srgb, var(--accent) 11%, transparent); }
+.tag.direct { color: #6e665a; background: rgba(110,102,90,.12); }
+[data-theme="dark"] .tag.ssh { color: #efb49a; background: rgba(217,119,87,.18); }
+[data-theme="dark"] .tag.direct { color: #c7bda9; background: rgba(199,189,169,.14); }
+
+.btn {
+  height: 30px; display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  padding: 0 12px; border-radius: 8px; border: 1px solid var(--border);
+  background: var(--surface); color: var(--ink); font-size: 11px; font-weight: 600; white-space: nowrap;
+}
+.btn:hover { background: var(--surface-muted); }
+.btn.primary { color: var(--on-accent); border-color: transparent; background: var(--accent-fill); }
+.btn.primary:hover { background: var(--accent-fill); opacity: .9; }
+.btn.destructive { color: var(--on-accent); border-color: transparent; background: var(--bad); }
+.btn.destructive:hover { background: var(--bad); opacity: .9; }
+.btn.sm { height: 26px; padding: 0 9px; font-size: 10px; }
+.btn.ghost { background: transparent; border-color: transparent; box-shadow: none; color: var(--ink3); }
+.link-btn { border: 0; background: transparent; color: var(--accent); font-size: 10px; font-weight: 600; padding: 3px 5px; border-radius: 5px; }
+.link-btn:hover { background: color-mix(in srgb, var(--accent) 9%, transparent); }
+
+/* detail */
+.detail { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+.detail-body { display: flex; flex-direction: column; flex: 1; min-height: 0; }
+.detail-body[hidden] { display: none; }
+.detail-empty { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 11px; padding: 32px; text-align: center; }
+.detail-empty[hidden] { display: none; }
+.detail-empty .empty-icon { width: 52px; height: 52px; border-radius: 14px; display: grid; place-items: center; color: var(--accent); background: var(--accent-soft); }
+.detail-empty h2 { margin: 0; font-family: var(--font-serif); font-size: 23px; font-weight: 600; letter-spacing: -.01em; }
+.detail-empty p { margin: 0; max-width: 340px; font-size: 11px; line-height: 1.55; color: var(--ink2); }
+.detail-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 18px; padding: 32px 34px 14px; }
+.head-main h1 { margin: 0 0 6px; font-family: var(--font-serif); font-size: 24px; font-weight: 600; letter-spacing: -.015em; }
+.head-sub { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.head-addr { font-size: 10.5px; color: var(--ink2); }
+.head-actions { display: flex; align-items: center; gap: 8px; padding-top: 4px; flex: none; }
+.head-actions .lbl { font-size: 10.5px; color: var(--ink3); }
+
+.signal {
+  display: flex; align-items: center; gap: 13px;
+  margin: 0 32px; padding: 8px 10px 8px 14px; min-height: 50px;
+  border-radius: 12px; background: color-mix(in srgb, var(--ok) 7%, var(--surface));
+  border: 1px solid color-mix(in srgb, var(--ok) 18%, transparent);
+}
+.signal.off { background: var(--surface-muted); border-color: var(--border); }
+.sig-state { display: flex; align-items: center; gap: 7px; font-size: 11px; font-weight: 600; white-space: nowrap; }
+.sig-latency { display: flex; align-items: baseline; gap: 2px; }
+.sig-latency b { font-family: var(--font-num); font-size: 20px; font-weight: 600; letter-spacing: -.02em; }
+.sig-latency span { font-size: 9px; color: var(--ink3); font-weight: 600; }
+.sig-wave { width: 150px; height: 30px; flex: 0 1 150px; }
+.sig-wave path.line { fill: none; stroke: var(--ok); stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+.sig-wave path.area { fill: color-mix(in srgb, var(--ok) 9%, transparent); }
+.sig-meta { display: flex; flex-direction: column; gap: 2px; font-size: 9.5px; color: var(--ink3); white-space: nowrap; }
+.sig-meta b { color: var(--ink2); font-weight: 600; }
+.signal .btn { margin-left: auto; }
+
+.detail-scroll { flex: 1; min-height: 0; overflow: auto; padding: 14px 34px 16px; scrollbar-width: thin; }
+.detail-scroll::-webkit-scrollbar { width: 8px; }
+.detail-scroll::-webkit-scrollbar-thumb { background: color-mix(in srgb, var(--ink3) 28%, transparent); border: 2px solid transparent; background-clip: padding-box; border-radius: 999px; }
+.card {
+  padding: 14px; border-radius: 12px;
+  background: var(--surface); border: 1px solid var(--border);
+}
+.card + .card { margin-top: 12px; }
+.card-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; margin-bottom: 10px; }
+.card-head h2 { margin: 0 0 2px; font-size: 12px; font-weight: 650; }
+.card-head p { margin: 0; font-size: 10.5px; color: var(--ink3); line-height: 1.45; }
+
+.conn-summary { display: flex; align-items: center; gap: 11px; }
+.conn-icon {
+  width: 32px; height: 32px; border-radius: 9px; display: grid; place-items: center;
+  color: var(--accent); background: color-mix(in srgb, var(--accent) 10%, transparent);
+}
+.conn-main { min-width: 0; flex: 1; }
+.conn-title { font-size: 11px; font-weight: 600; color: var(--ink); }
+.conn-addr { margin-top: 2px; font-size: 9.5px; color: var(--ink3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.conn-summary .btn { flex: none; }
+
+.conn-edit { display: none; margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--hairline); }
+.card.editing .conn-edit { display: block; }
+.card.editing .conn-summary { display: none; }
+
+.field { display: flex; flex-direction: column; gap: 5px; }
+.field > span { font-size: 10px; font-weight: 550; color: var(--ink3); }
+.field input {
+  width: 100%; height: 33px; padding: 0 9px;
+  border: 1px solid var(--border); border-radius: 7px;
+  background: var(--surface); color: var(--ink); font-size: 11.5px;
+}
+.field input.mono, .mono { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+.field input:focus { outline: none; border-color: color-mix(in srgb, var(--accent) 55%, transparent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 14%, transparent); }
+.field + .field { margin-top: 10px; }
+.hint { font-size: 9.5px; line-height: 1.45; color: var(--ink3); }
+
+.inline-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 12px; }
+.inline-row .inline-label { font-size: 11px; font-weight: 600; color: var(--ink2); }
+.inline-row .inline-sub { font-size: 9.5px; color: var(--ink3); margin-top: 1px; }
+.conn-edit .row-end { display: flex; justify-content: flex-end; margin-top: 12px; }
+.jump-fields { margin-top: 10px; padding: 10px; border-radius: 10px; background: var(--code-bg); border: 1px solid var(--hairline); display: none; }
+.card.jump .jump-fields { display: block; }
+
+details.advanced { margin-top: 10px; border-top: 1px solid var(--hairline); padding-top: 9px; }
+details.advanced summary { cursor: pointer; font-size: 10px; font-weight: 600; color: var(--ink3); list-style: none; }
+details.advanced summary::-webkit-details-marker { display: none; }
+details.advanced summary::after { content: "›"; float: right; transform: rotate(90deg); transition: .2s; }
+details.advanced[open] summary::after { transform: rotate(-90deg); }
+.advanced-body { margin-top: 10px; display: grid; gap: 10px; }
+.cmd { border-radius: 9px; background: var(--code-bg); border: 1px solid var(--hairline); overflow: hidden; }
+.cmd-head { display: flex; align-items: center; justify-content: space-between; padding: 6px 8px 6px 10px; border-bottom: 1px solid var(--hairline); font-size: 9px; color: var(--ink3); }
+.cmd code { display: block; padding: 8px 10px; font-family: var(--font-mono); font-size: 9.5px; line-height: 1.55; color: var(--ink2); white-space: pre-wrap; word-break: break-all; }
+
+.key-field { display: flex; align-items: center; gap: 6px; }
+.key-field input { flex: 1; }
+.key-note { margin-top: 8px; display: flex; align-items: center; gap: 5px; font-size: 9.5px; color: var(--ink3); }
+
+.detail-foot {
+  display: flex; align-items: center; justify-content: space-between; gap: 14px;
+  padding: 11px 34px; border-top: 1px solid var(--border);
+  background: var(--canvas);
+}
+.foot-main { display: flex; align-items: center; gap: 9px; min-width: 0; }
+.foot-label { font-size: 9.5px; color: var(--ink3); white-space: nowrap; }
+.foot-url { font-family: var(--font-mono); font-size: 10px; color: var(--ink2); padding: 4px 8px; border-radius: 6px; background: var(--code-bg); border: 1px solid var(--hairline); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* overlays */
+.overlay {
+  position: absolute; inset: 0; z-index: 20;
+  display: none; align-items: center; justify-content: center;
+  padding: 24px;
+  background: color-mix(in srgb, #23211D 26%, transparent);
+  border-radius: 16px;
+}
+.overlay.show { display: flex; }
+.sheet-card {
+  width: 560px; max-height: 620px; display: flex; flex-direction: column;
+  border-radius: 20px; overflow: hidden;
+  box-shadow: var(--shadow-sheet);
+}
+.sheet-card.wide { width: 680px; }
+.sheet-card.confirm-card { width: 440px; }
+.sheet-head { padding: 20px 22px 12px; display: flex; align-items: flex-start; gap: 12px; }
+.sheet-head h2 { margin: 0 0 3px; font-family: var(--font-serif); font-size: 20px; font-weight: 600; letter-spacing: -.01em; }
+.sheet-head p { margin: 0; font-size: 10.5px; line-height: 1.45; color: var(--ink3); }
+.sheet-head .close { margin-left: auto; }
+.sheet-body { padding: 0 22px 20px; overflow: auto; }
+
+.preview {
+  margin-top: 14px; padding: 12px; border-radius: 10px;
+  background: var(--surface-muted);
+  border: 1px solid var(--border);
+}
+.preview .hint { margin: 0 0 5px; }
+.preview-type { font-size: 10px; font-weight: 650; color: var(--accent); }
+.preview-url { display: block; margin-top: 3px; font-family: var(--font-mono); font-size: 10px; color: var(--ink2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.preview p { margin: 8px 0 0; font-size: 9.5px; line-height: 1.5; color: var(--ink3); }
+
+.sheet-foot { display: flex; justify-content: flex-end; gap: 8px; padding: 12px 22px; border-top: 1px solid var(--hairline); }
+
+/* manager */
+.manage-list { padding: 0 22px 8px; overflow: auto; }
+.manage-row {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 4px; border-top: 1px solid var(--hairline);
+}
+.manage-row:first-child { border-top: 0; }
+.manage-main { min-width: 0; flex: 1; }
+.manage-name { font-size: 12px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.manage-sub { margin-top: 2px; display: flex; align-items: center; gap: 6px; font-size: 9.5px; color: var(--ink3); }
+.manage-row .switch { flex: none; }
+.manage-row .icon-btn { width: 28px; height: 28px; color: var(--bad); }
+.manage-empty { padding: 24px 0; text-align: center; font-size: 11px; color: var(--ink3); }
+
+/* settings */
+.settings-body { padding: 0 22px 20px; overflow: auto; }
+.setting-section { padding: 12px 0; border-top: 1px solid var(--hairline); }
+.setting-section:first-child { border-top: 0; padding-top: 0; }
+.setting-title { font-size: 12px; font-weight: 650; margin: 0 0 3px; }
+.setting-sub { margin: 0 0 10px; font-size: 10px; line-height: 1.5; color: var(--ink3); }
+.setting-card { padding: 12px; border-radius: 10px; background: var(--surface-muted); border: 1px solid var(--border); }
+.setting-loc { display: flex; align-items: center; gap: 10px; }
+.setting-loc .loc-icon { width: 28px; height: 28px; border-radius: 8px; display: grid; place-items: center; color: var(--accent); background: color-mix(in srgb, var(--accent) 10%, transparent); }
+.setting-loc .loc-main { min-width: 0; }
+.setting-loc .loc-name { font-size: 11.5px; font-weight: 600; }
+.setting-loc .loc-path { margin-top: 1px; font-family: var(--font-mono); font-size: 9px; color: var(--ink3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.setting-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+.setting-note { margin-top: 10px; font-size: 9.5px; line-height: 1.45; color: var(--ink3); }
+.backup-list { margin-top: 10px; border-radius: 10px; border: 1px solid var(--hairline); overflow: hidden; }
+.backup-row { display: flex; align-items: center; gap: 9px; padding: 8px 10px; border-top: 1px solid var(--hairline); }
+.backup-row:first-child { border-top: 0; }
+.backup-main { min-width: 0; flex: 1; }
+.backup-time { font-size: 10.5px; font-weight: 600; }
+.backup-summary { margin-top: 1px; font-size: 9.5px; color: var(--ink3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mode-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+
+/* toast */
+.toast {
+  position: fixed; left: 50%; bottom: 26px; z-index: 60;
+  transform: translate(-50%, 16px); opacity: 0; pointer-events: none;
+  padding: 9px 15px; border-radius: 11px; background: color-mix(in srgb, #2a2420 88%, transparent);
+  color: #fff; font-size: 11.5px; font-weight: 500;
+  box-shadow: 0 16px 40px -14px rgba(0,0,0,.6);
+  transition: opacity .22s, transform .26s cubic-bezier(.2,.8,.3,1);
+}
+.toast.show { opacity: 1; transform: translate(-50%, 0); }
+
+@media (max-width: 760px) {
+  .demo-bar { flex-wrap: wrap; padding: 10px 14px; }
+  .demo-hint { display: none; }
+  .seg button { padding: 5px 9px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { transition-duration: .001ms !important; animation-duration: .001ms !important; }
+}
+</style>
+</head>
+<body data-view="main">
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-chain" viewBox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7.07 0l2.12-2.12a5 5 0 0 0-7.07-7.07L11 4.93"/><path d="M14 11a5 5 0 0 0-7.07 0L4.8 13.12a5 5 0 0 0 7.07 7.07L13 19.07"/></symbol>
+  <symbol id="i-copy" viewBox="0 0 24 24"><rect x="9" y="9" width="11" height="11" rx="2.5"/><path d="M5 15H4.5A1.5 1.5 0 0 1 3 13.5v-9A1.5 1.5 0 0 1 4.5 3h9A1.5 1.5 0 0 1 15 4.5V5"/></symbol>
+  <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+  <symbol id="i-gear" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.87l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06A1.7 1.7 0 0 0 15 19.4a1.7 1.7 0 0 0-1 1.55V21a2 2 0 1 1-4 0v-.09A1.7 1.7 0 0 0 9 19.4a1.7 1.7 0 0 0-1.87.34l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.7 1.7 0 0 0 4.6 15a1.7 1.7 0 0 0-1.55-1H3a2 2 0 1 1 0-4h.09A1.7 1.7 0 0 0 4.6 9a1.7 1.7 0 0 0-.34-1.87l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.7 1.7 0 0 0 9 4.6 1.7 1.7 0 0 0 10 3.05V3a2 2 0 1 1 4 0v.09A1.7 1.7 0 0 0 15 4.6a1.7 1.7 0 0 0 1.87-.34l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.7 1.7 0 0 0 19.4 9a1.7 1.7 0 0 0 1.55 1H21a2 2 0 1 1 0 4h-.09a1.7 1.7 0 0 0-1.51 1z"/></symbol>
+  <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></symbol>
+  <symbol id="i-bolt" viewBox="0 0 24 24"><path d="M13 2 4.5 13.5H11l-1 8.5L19.5 10H13l1-8z"/></symbol>
+  <symbol id="i-link" viewBox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7.07 0l2.12-2.12a5 5 0 0 0-7.07-7.07L11 4.93"/><path d="M14 11a5 5 0 0 0-7.07 0L4.8 13.12a5 5 0 0 0 7.07 7.07L13 19.07"/></symbol>
+  <symbol id="i-lock" viewBox="0 0 24 24"><rect x="4.5" y="10.5" width="15" height="10" rx="2.5"/><path d="M8 10.5V8a4 4 0 0 1 8 0v2.5"/></symbol>
+  <symbol id="i-eye" viewBox="0 0 24 24"><path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z"/><circle cx="12" cy="12" r="2.8"/></symbol>
+  <symbol id="i-eye-off" viewBox="0 0 24 24"><path d="M3 3l18 18"/><path d="M10.6 6.1A9.9 9.9 0 0 1 12 6c6 0 9.5 6 9.5 6a17 17 0 0 1-2.4 3.1"/><path d="M6.2 6.2A16.8 16.8 0 0 0 2.5 12S6 18 12 18a9.7 9.7 0 0 0 4.1-.9"/><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2"/></symbol>
+  <symbol id="i-trash" viewBox="0 0 24 24"><path d="M4 7h16M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2M7 7l1 12a2 2 0 0 0 2 2h4a2 2 0 0 0 2-2l1-12"/></symbol>
+  <symbol id="i-terminal" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="3"/><path d="m7 9 3 3-3 3M13 15h4"/></symbol>
+  <symbol id="i-moon" viewBox="0 0 24 24"><path d="M20 14.5A8.5 8.5 0 0 1 9.5 4 8.5 8.5 0 1 0 20 14.5z"/></symbol>
+  <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></symbol>
+  <symbol id="i-clock" viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/><path d="M12 7v5l3 2"/></symbol>
+  <symbol id="i-folder" viewBox="0 0 24 24"><path d="M3 7.5A2.5 2.5 0 0 1 5.5 5h4l2 2.5h7A2.5 2.5 0 0 1 21 10v7.5a2.5 2.5 0 0 1-2.5 2.5h-13A2.5 2.5 0 0 1 3 17.5z"/></symbol>
+  <symbol id="i-cloud" viewBox="0 0 24 24"><path d="M7 18a4.5 4.5 0 0 1-.7-8.95A6 6 0 0 1 18 9a4 4 0 0 1 0 8z"/></symbol>
+  <symbol id="i-doc" viewBox="0 0 24 24"><path d="M6 3h8l4 4v14H6z"/><path d="M14 3v4h4"/></symbol>
+  <symbol id="i-x" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></symbol>
+  <symbol id="i-minus" viewBox="0 0 24 24"><path d="M5 12h14"/></symbol>
+  <symbol id="i-power" viewBox="0 0 24 24"><path d="M12 3v9"/><path d="M6.4 6.4a8 8 0 1 0 11.2 0"/></symbol>
+</svg>
+
+<header class="demo-bar">
+  <div class="demo-title">
+    <span class="mark"><svg class="i sm"><use href="#i-chain"/></svg></span>
+    FreeAPI · 使用流程重设计
+    <span class="ver">v3 concept</span>
+  </div>
+  <div class="demo-actions">
+    <span class="demo-hint">添加服务只有一步；跳板机在详情里</span>
+    <div class="seg" id="viewTabs">
+      <button data-view="main" class="on">主窗口</button>
+      <button data-view="add">添加服务</button>
+      <button data-view="settings">设置</button>
+    </div>
+    <button class="icon-btn" id="themeBtn" aria-label="切换深色外观"><svg class="i"><use id="themeIcon" href="#i-moon"/></svg></button>
+  </div>
+</header>
+
+<main class="stage">
+  <div class="surface" id="surface">
+    <div class="app-window glass" id="appWindow">
+      <div class="traffic" aria-hidden="true"><i></i><i></i><i></i></div>
+
+      <aside class="sidebar">
+        <div class="brand">
+          <span class="brand-logo"><svg class="i"><use href="#i-chain"/></svg></span>
+          <span class="brand-name">FreeAPI</span>
+          <span class="brand-ver">2.x</span>
+        </div>
+        <div class="search">
+          <svg class="i"><use href="#i-search"/></svg>
+          <input type="text" placeholder="搜索服务" id="searchInput" />
+        </div>
+        <div class="list-head">
+          <span>服务</span><span class="list-count" id="serviceCount">3</span>
+        </div>
+        <div class="service-list" id="serviceList" role="listbox" aria-multiselectable="true"></div>
+        <div class="sidebar-foot">
+          <div class="action-row">
+            <button class="icon-btn add-icon" id="addServiceBtn" title="添加服务" aria-label="添加服务"><svg class="i sm"><use href="#i-plus"/></svg></button>
+            <button class="icon-btn" id="deleteBtn" title="删除选中服务" aria-label="删除选中服务" disabled><svg class="i sm"><use href="#i-minus"/></svg></button>
+            <button class="icon-btn" id="toggleBtn" title="禁用选中服务" aria-label="禁用选中服务" disabled><svg class="i sm"><use href="#i-power"/></svg></button>
+            <button class="icon-btn settings-btn" id="settingsBtn" aria-label="设置" title="设置"><svg class="i sm"><use href="#i-gear"/></svg></button>
+          </div>
+        </div>
+      </aside>
+
+      <section class="detail">
+        <div class="detail-body" id="detailBody">
+        <header class="detail-head">
+          <div class="head-main">
+            <h1 id="dName">北大 DeepSeek</h1>
+            <div class="head-sub">
+              <span class="chip ok" id="dChip"></span>
+              <span class="mono head-addr" id="dBase"></span>
+              <span class="tag ssh" id="dType"></span>
+            </div>
+          </div>
+        </header>
+
+        <div class="signal" id="signal">
+          <span class="sig-state"><span class="dot ok" id="sigDot"></span><span id="sigText">已连接</span></span>
+          <span class="sig-latency"><b id="sigMs">28</b><span>ms</span></span>
+          <svg class="sig-wave" viewBox="0 0 150 30" preserveAspectRatio="none" aria-hidden="true">
+            <path class="area" id="waveArea" d=""></path><path class="line" id="waveLine" d=""></path>
+          </svg>
+          <span class="sig-meta"><span>HTTP <b id="sigHttp">200</b></span><span>检查于 <b id="sigWhen">5 秒前</b></span></span>
+          <button class="btn primary sm" id="testBtn"><svg class="i sm"><use href="#i-bolt"/></svg>测试连接</button>
+        </div>
+
+        <div class="detail-scroll">
+          <section class="card" id="connCard">
+            <div class="conn-summary">
+              <span class="conn-icon"><svg class="i"><use id="connIcon" href="#i-link"/></svg></span>
+              <div class="conn-main">
+                <div class="conn-title" id="connTitle">经跳板机</div>
+                <div class="conn-addr mono" id="connAddr"></div>
+              </div>
+              <button class="btn sm" id="editConn">编辑</button>
+            </div>
+            <div class="conn-edit">
+              <label class="field"><span>API 地址</span><input class="mono" id="connURL" spellcheck="false" /></label>
+              <div class="inline-row">
+                <div><div class="inline-label">经跳板机</div><div class="inline-sub">只有这个地址不能直连时才需要打开</div></div>
+                <button class="switch" id="jumpSwitch" role="switch" aria-checked="false"><span class="track"></span><span class="thumb"></span></button>
+              </div>
+              <div class="jump-fields">
+                <label class="field"><span>跳板机</span><input class="mono" id="jumpHost" placeholder="user@bastion.example.com" spellcheck="false" /></label>
+                <div class="hint" style="margin-top:8px">API 地址是跳板机能访问的目标；本机会在 127.0.0.1 上开一个本地地址。</div>
+                <details class="advanced">
+                  <summary>高级选项</summary>
+                  <div class="advanced-body">
+                    <label class="field"><span>本地端口</span><input class="mono" id="localPort" value="18189" /></label>
+                    <div class="cmd">
+                      <div class="cmd-head"><span>生成的 SSH 命令</span><button class="link-btn" id="copyCmd">复制</button></div>
+                      <code id="cmdText"></code>
+                    </div>
+                  </div>
+                </details>
+              </div>
+              <div class="row-end"><button class="btn primary" id="doneConn">完成</button></div>
+            </div>
+          </section>
+
+          <section class="card">
+            <div class="card-head">
+              <div><h2>API Key</h2><p>可选。保存在 macOS 钥匙串，用于测试和客户端提示。</p></div>
+            </div>
+            <div class="key-field">
+              <input type="password" class="mono" id="apiKey" value="sk-live-xxxxxxxxxxxxxxxx" />
+              <button class="icon-btn" id="eyeBtn" aria-label="显示 API Key"><svg class="i sm"><use id="eyeIcon" href="#i-eye"/></svg></button>
+            </div>
+            <div class="key-note"><svg class="i sm"><use href="#i-lock"/></svg>不会写入配置文件或日志</div>
+          </section>
+        </div>
+
+        <footer class="detail-foot">
+          <div class="foot-main">
+            <span class="foot-label">客户端使用</span>
+            <code class="foot-url" id="dEndpoint"></code>
+          </div>
+          <button class="btn" id="copyBase"><svg class="i sm"><use href="#i-copy"/></svg>复制地址</button>
+        </footer>
+        </div>
+        <div class="detail-empty" id="detailEmpty" hidden>
+          <span class="empty-icon"><svg class="i"><use href="#i-link"/></svg></span>
+          <h2>还没有服务</h2>
+          <p>添加一个 API 地址就能开始。跳板机、本地端口这些高级选项可以稍后设置。</p>
+          <button class="btn primary" id="emptyAdd"><svg class="i sm"><use href="#i-plus"/></svg>添加第一个服务</button>
+        </div>
+      </section>
+    </div>
+
+    <!-- add service -->
+    <div class="overlay" id="overlayAdd">
+      <div class="sheet-card glass">
+        <div class="sheet-head">
+          <div>
+            <h2>添加服务</h2>
+            <p>粘贴 API 地址即可。跳板机和高级选项可以稍后设置。</p>
+          </div>
+          <button class="icon-btn close" id="closeAdd" aria-label="关闭"><svg class="i sm"><use href="#i-x"/></svg></button>
+        </div>
+        <div class="sheet-body">
+          <label class="field">
+            <span>API 地址</span>
+            <input class="mono" id="addURL" placeholder="https://api.example.com/v1" spellcheck="false" autofocus />
+          </label>
+          <div class="hint" style="margin-top:6px">可以粘贴完整 URL；路径会自动识别，未写路径时默认 /v1。</div>
+          <label class="field" style="margin-top:14px">
+            <span>API Key（可选）</span>
+            <input type="password" class="mono" id="addKey" placeholder="sk-…" autocomplete="off" />
+          </label>
+          <div class="preview">
+            <div class="hint">将添加</div>
+            <span class="preview-type" id="previewType">直连</span>
+            <code class="preview-url" id="previewURL">https://api.deepseek.com/v1</code>
+            <p>如果这个地址只能通过跳板机访问，添加后在服务详情的「连接」里打开「经跳板机」即可。</p>
+          </div>
+        </div>
+        <div class="sheet-foot">
+          <button class="btn" id="cancelAdd">取消</button>
+          <button class="btn primary" id="confirmAdd">添加并测试</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- settings -->
+    <div class="overlay" id="overlaySettings">
+      <div class="sheet-card wide glass">
+        <div class="sheet-head">
+          <div>
+            <h2>设置</h2>
+            <p>配置存储、备份和运行模式这些不常改的选项放在这里。</p>
+          </div>
+          <button class="icon-btn close" id="closeSettings" aria-label="关闭"><svg class="i sm"><use href="#i-x"/></svg></button>
+        </div>
+        <div class="settings-body">
+          <section class="setting-section">
+            <h3 class="setting-title">配置存储</h3>
+            <p class="setting-sub">配置会自动保存到当前位置，并同步到同一 iCloud 账户。</p>
+            <div class="setting-card">
+              <div class="setting-loc">
+                <span class="loc-icon"><svg class="i"><use href="#i-cloud"/></svg></span>
+                <div class="loc-main">
+                  <div class="loc-name">iCloud Drive/FreeAPI</div>
+                  <div class="loc-path">~/Library/Mobile Documents/com~apple~CloudDocs/FreeAPI</div>
+                </div>
+              </div>
+              <div class="setting-actions">
+                <button class="btn sm" id="useLocal">使用本机默认位置</button>
+                <button class="btn sm" id="chooseFolder">选择其它文件夹…</button>
+                <button class="btn sm" id="reloadConfig">重新载入</button>
+              </div>
+            </div>
+          </section>
+          <section class="setting-section">
+            <h3 class="setting-title">配置备份</h3>
+            <p class="setting-sub">每次保存记录改动，最多保留 20 份；恢复前会先保存当前配置。</p>
+            <div class="backup-list" id="backupList"></div>
+            <p class="setting-note">API Key 不会随备份恢复；已删除的 Key 需要重新填写。</p>
+          </section>
+          <section class="setting-section">
+            <h3 class="setting-title">运行模式</h3>
+            <p class="setting-sub">默认所有启用的服务同时运行。需要时再切到单路。</p>
+            <div class="setting-card mode-row">
+              <div><div class="loc-name" id="modeName">同时运行多个服务</div><div class="loc-path" style="font-family:var(--font-ui)">每个服务使用自己的本地端口</div></div>
+              <div class="seg" id="modeSeg"><button class="on" data-mode="parallel">同时</button><button data-mode="single">单路</button></div>
+            </div>
+          </section>
+        </div>
+        <div class="sheet-foot"><button class="btn primary" id="settingsDone">完成</button></div>
+      </div>
+    </div>
+
+    <!-- delete confirmation -->
+    <div class="overlay" id="overlayDelete">
+      <div class="sheet-card confirm-card glass">
+        <div class="sheet-head">
+          <div>
+            <h2 id="deleteTitle">删除服务？</h2>
+            <p id="deleteText"></p>
+          </div>
+        </div>
+        <div class="sheet-foot">
+          <button class="btn" id="cancelDelete">取消</button>
+          <button class="btn destructive" id="confirmDelete">删除</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</main>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script>
+(function () {
+  'use strict';
+  const $ = (s, r) => (r || document).querySelector(s);
+  const $$ = (s, r) => Array.from((r || document).querySelectorAll(s));
+  const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+  const services = [
+    {
+      id: 'pku', name: '北大 DeepSeek', transport: 'ssh', scheme: 'http',
+      host: '11.250.1.209', port: 8189, path: '/v1', localPort: 18189,
+      jump: 'chengqiyi_pkuhpc@100.66.1.7', enabled: true, latency: 28,
+      history: [31, 27, 29, 33, 28, 26, 30, 27, 28, 29, 31, 28, 27, 30, 26, 28, 29, 27, 28, 28],
+      key: 'sk-live-xxxxxxxxxxxxxxxx'
+    },
+    {
+      id: 'ds', name: 'DeepSeek 官方', transport: 'direct', scheme: 'https',
+      host: 'api.deepseek.com', port: 443, path: '/v1', localPort: null,
+      jump: '', enabled: true, latency: 96,
+      history: [102, 98, 95, 99, 101, 94, 97, 96, 98, 95, 100, 97, 96, 94, 99, 97, 96, 95, 98, 96],
+      key: 'sk-ds-xxxxxxxx'
+    },
+    {
+      id: 'hz', name: '杭州推理集群', transport: 'ssh', scheme: 'http',
+      host: 'infer.hz.example.com', port: 8443, path: '/v1', localPort: 18191,
+      jump: 'hnzhao@jump.hz', enabled: false, latency: null,
+      history: [], key: ''
+    }
+  ];
+
+  let selectedIDs = ['pku'];
+  let primaryID = 'pku';
+  let anchorID = 'pku';
+  let pendingDeleteIDs = [];
+  let view = 'main';
+  let mode = 'parallel';
+  let editingConn = false;
+
+  const current = () => services.find((s) => s.id === primaryID) || null;
+  const selectedServices = () => services.filter((s) => selectedIDs.includes(s.id));
+
+  function upstreamURL(s) {
+    const defaultPort = (s.scheme === 'https' && s.port === 443) || (s.scheme === 'http' && s.port === 80);
+    return `${s.scheme}://${s.host}${defaultPort ? '' : ':' + s.port}${s.path || ''}`;
+  }
+  function endpoint(s) {
+    if (s.transport === 'ssh') return `http://127.0.0.1:${s.localPort || 18189}${s.path || ''}`;
+    return upstreamURL(s);
+  }
+  function nextPort() {
+    return services.reduce((max, s) => Math.max(max, s.localPort || 0), 18188) + 1;
+  }
+  function parseAddress(raw) {
+    let value = String(raw || '').trim();
+    if (!value) return null;
+    if (!/^[a-z][a-z0-9+.-]*:\/\//i.test(value)) value = 'https://' + value;
+    try {
+      const u = new URL(value);
+      const cleanPath = u.pathname && u.pathname !== '/' ? u.pathname.replace(/\/+$/, '') : '/v1';
+      return {
+        scheme: u.protocol.replace(':', ''),
+        host: u.hostname,
+        port: Number(u.port) || (u.protocol === 'https:' ? 443 : 80),
+        path: cleanPath || '/v1'
+      };
+    } catch (e) { return null; }
+  }
+  function serviceType(s) { return s.transport === 'ssh' ? '经跳板机' : '直连'; }
+  function statusOf(s) {
+    if (!s.enabled) return { key: 'off', label: '未启用' };
+    if (s.latency == null) return { key: 'warn', label: '正在连接' };
+    return { key: 'ok', label: '已连接' };
+  }
+  function msOf(s) {
+    if (!s.enabled) return { text: '已禁用', key: 'off' };
+    if (s.latency == null) return { text: '—', key: 'warn' };
+    return { text: `${s.latency} ms`, key: 'ok' };
+  }
+  function sshCommand(s) {
+    return `ssh -NT -o BatchMode=yes -o StrictHostKeyChecking=yes -L 127.0.0.1:${s.localPort || 18189}:${s.host}:${s.port} ${s.jump || 'user@bastion'}`;
+  }
+  function wavePath(values, w, h, pad) {
+    const data = values && values.length ? values : [1, 1, 1, 1];
+    const min = Math.min.apply(null, data), max = Math.max.apply(null, data), span = Math.max(1, max - min);
+    const pts = data.map((v, i) => [
+      pad + (w - pad * 2) * i / Math.max(1, data.length - 1),
+      pad + (h - pad * 2) * (1 - (v - min) / span)
+    ]);
+    let line = `M ${pts[0][0].toFixed(1)} ${pts[0][1].toFixed(1)}`;
+    for (let i = 1; i < pts.length; i++) {
+      const mx = (pts[i - 1][0] + pts[i][0]) / 2;
+      line += ` C ${mx.toFixed(1)} ${pts[i - 1][1].toFixed(1)}, ${mx.toFixed(1)} ${pts[i][1].toFixed(1)}, ${pts[i][0].toFixed(1)} ${pts[i][1].toFixed(1)}`;
+    }
+    return { line, area: `${line} L ${w - pad} ${h} L ${pad} ${h} Z` };
+  }
+
+  function renderSidebar() {
+    const list = $('#serviceList');
+    if (!services.length) {
+      list.innerHTML = '<div class="list-empty">还没有服务<br>用下面的 + 添加第一个</div>';
+    } else {
+      list.innerHTML = services.map((s) => {
+        const st = statusOf(s);
+        const ms = msOf(s);
+        const selected = selectedIDs.includes(s.id);
+        const primary = s.id === primaryID;
+        return `<div class="row ${selected ? 'sel' : ''} ${primary ? 'primary' : ''}" data-select="${s.id}" role="option" tabindex="0" aria-selected="${selected}">
+          <span class="node"><span class="dot ${st.key}"></span></span>
+          <span class="row-name">${esc(s.name)}</span>
+          <span class="row-sub"><span class="tag ${s.transport === 'ssh' ? 'ssh' : 'direct'}">${s.transport === 'ssh' ? '跳板机' : '直连'}</span><span class="addr mono">${esc(s.transport === 'ssh' ? '127.0.0.1:' + s.localPort : s.host)}</span><span class="ms ${ms.key}">${ms.text}</span></span>
+        </div>`;
+      }).join('');
+    }
+    $('#serviceCount').textContent = services.length;
+    const count = selectedIDs.length;
+    $('#deleteBtn').disabled = count === 0;
+    $('#toggleBtn').disabled = count === 0;
+    const allOn = count > 0 && selectedServices().every((s) => s.enabled);
+    $('#toggleBtn').title = allOn ? '禁用选中服务' : '启用选中服务';
+    $('#toggleBtn').setAttribute('aria-label', $('#toggleBtn').title);
+  }
+
+  function renderDetail() {
+    const s = current();
+    $('#detailBody').hidden = !s;
+    $('#detailEmpty').hidden = !!s;
+    if (!s) return;
+    const st = statusOf(s);
+    $('#dName').textContent = s.name;
+    $('#dChip').className = `chip ${st.key}`;
+    $('#dChip').innerHTML = `<span class="dot ${st.key}"></span>${st.label}`;
+    $('#dBase').textContent = `${s.host}:${s.port}`;
+    $('#dType').textContent = serviceType(s);
+    $('#dType').className = `tag ${s.transport === 'ssh' ? 'ssh' : 'direct'}`;
+    $('#dEndpoint').textContent = endpoint(s);
+
+    $('#sigText').textContent = st.label;
+    $('#sigDot').className = `dot ${st.key}`;
+    $('#signal').classList.toggle('off', !s.enabled);
+    $('#sigMs').textContent = s.enabled && s.latency != null ? s.latency : '—';
+    $('#sigHttp').textContent = s.enabled && s.latency != null ? '200' : '—';
+    $('#sigWhen').textContent = s.enabled ? '5 秒前' : '未检查';
+    const wp = wavePath(s.history, 150, 30, 3);
+    $('#waveLine').setAttribute('d', wp.line);
+    $('#waveArea').setAttribute('d', wp.area);
+
+    $('#connTitle').textContent = serviceType(s);
+    $('#connAddr').textContent = s.transport === 'ssh'
+      ? `${s.host}:${s.port} → 127.0.0.1:${s.localPort}`
+      : `${s.scheme}://${s.host}${s.port === 443 ? '' : ':' + s.port}`;
+    $('#connIcon').setAttribute('href', s.transport === 'ssh' ? '#i-link' : '#i-cloud');
+    $('#connURL').value = upstreamURL(s);
+    $('#jumpHost').value = s.jump || '';
+    $('#jumpSwitch').classList.toggle('on', s.transport === 'ssh');
+    $('#jumpSwitch').setAttribute('aria-checked', String(s.transport === 'ssh'));
+    $('#connCard').classList.toggle('jump', s.transport === 'ssh');
+    $('#connCard').classList.toggle('editing', editingConn);
+    $('#localPort').value = s.localPort || 18189;
+    $('#cmdText').textContent = sshCommand(s);
+    $('#apiKey').value = s.key || '';
+  }
+
+  function renderBackups() {
+    const backups = [
+      { when: '11月11日 18:58', summary: '修改「北大 DeepSeek」：服务器地址、端口' },
+      { when: '11月11日 18:52', summary: '启用「DeepSeek 官方」' },
+      { when: '11月11日 18:41', summary: '切换为单路模式' }
+    ];
+    $('#backupList').innerHTML = backups.map((b) => `<div class="backup-row">
+      <svg class="i sm" style="color:var(--accent)"><use href="#i-clock"/></svg>
+      <div class="backup-main"><div class="backup-time">${b.when}</div><div class="backup-summary">${esc(b.summary)}</div></div>
+      <button class="btn sm" data-restore="${esc(b.when)}">恢复</button>
+    </div>`).join('');
+  }
+
+  function renderAll() {
+    renderSidebar();
+    renderDetail();
+    renderBackups();
+  }
+
+  function selectRow(id, extend) {
+    const index = services.findIndex((s) => s.id === id);
+    if (index < 0) return;
+    if (extend && anchorID) {
+      const anchor = services.findIndex((s) => s.id === anchorID);
+      if (anchor >= 0) {
+        const low = Math.min(anchor, index), high = Math.max(anchor, index);
+        selectedIDs = services.slice(low, high + 1).map((s) => s.id);
+      } else {
+        selectedIDs = [id];
+        anchorID = id;
+      }
+    } else {
+      selectedIDs = [id];
+      anchorID = id;
+    }
+    primaryID = id;
+    editingConn = false;
+    renderAll();
+  }
+
+  function openDelete() {
+    const selected = selectedServices();
+    if (!selected.length) return;
+    pendingDeleteIDs = selected.map((s) => s.id);
+    const names = selected.map((s) => `「${s.name}」`);
+    $('#deleteTitle').textContent = selected.length === 1 ? '删除服务？' : `删除 ${selected.length} 个服务？`;
+    $('#deleteText').textContent = selected.length === 1
+      ? `将从本机移除${names[0]}及其 API Key，此操作不可撤销。`
+      : `将移除${names.join('、')}及其 API Key，此操作不可撤销。`;
+    $('#overlayDelete').classList.add('show');
+  }
+
+  function closeDelete() {
+    pendingDeleteIDs = [];
+    $('#overlayDelete').classList.remove('show');
+  }
+
+  function confirmDelete() {
+    if (!pendingDeleteIDs.length) return;
+    const ids = pendingDeleteIDs.slice();
+    const firstIndex = services.findIndex((s) => ids.includes(s.id));
+    const removed = services.filter((s) => ids.includes(s.id)).length;
+    for (let i = services.length - 1; i >= 0; i--) {
+      if (ids.includes(services[i].id)) services.splice(i, 1);
+    }
+    const next = services[Math.min(Math.max(firstIndex, 0), services.length - 1)] || null;
+    selectedIDs = next ? [next.id] : [];
+    primaryID = next ? next.id : null;
+    anchorID = next ? next.id : null;
+    pendingDeleteIDs = [];
+    editingConn = false;
+    $('#overlayDelete').classList.remove('show');
+    renderAll();
+    toast(removed === 1 ? '已删除 1 个服务' : `已删除 ${removed} 个服务`);
+  }
+
+  function toggleSelected() {
+    const selected = selectedServices();
+    if (!selected.length) return;
+    const allOn = selected.every((s) => s.enabled);
+    selected.forEach((s) => {
+      s.enabled = !allOn;
+      if (s.enabled && s.latency == null) {
+        s.latency = 24;
+        s.history = [24, 24, 24, 24];
+      }
+    });
+    renderAll();
+    toast(allOn ? `已禁用 ${selected.length} 个服务` : `已启用 ${selected.length} 个服务`);
+  }
+
+  function setView(next) {
+    view = next;
+    document.body.dataset.view = next;
+    $$('#viewTabs button').forEach((b) => b.classList.toggle('on', b.dataset.view === next));
+    $('#overlayAdd').classList.toggle('show', next === 'add');
+    $('#overlaySettings').classList.toggle('show', next === 'settings');
+    $('#overlayDelete').classList.remove('show');
+    if (next === 'add') setTimeout(() => $('#addURL').focus(), 50);
+    fit();
+  }
+
+  function fit() {
+    const width = $('.stage').clientWidth - 48;
+    const scale = Math.min(1, Math.max(0.55, width / 1040));
+    $('#surface').style.zoom = scale;
+  }
+
+  let toastTimer = null;
+  function toast(text) {
+    const el = $('#toast');
+    el.textContent = text;
+    el.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => el.classList.remove('show'), 2300);
+  }
+
+  document.addEventListener('click', (e) => {
+    const tab = e.target.closest('#viewTabs button');
+    if (tab) { setView(tab.dataset.view); return; }
+    const row = e.target.closest('[data-select]');
+    if (row) { selectRow(row.dataset.select, e.shiftKey); return; }
+    const restore = e.target.closest('[data-restore]');
+    if (restore) { toast(`已恢复到 ${restore.dataset.restore} 的配置（示意）`); return; }
+  });
+
+  document.addEventListener('keydown', (e) => {
+    if ((e.key === 'Enter' || e.key === ' ') && e.target.closest('[data-select]')) {
+      e.preventDefault();
+      selectRow(e.target.closest('[data-select]').dataset.select, e.shiftKey);
+      return;
+    }
+    if (e.key === 'Escape') {
+      if ($('#overlayDelete').classList.contains('show')) closeDelete();
+      else if (view !== 'main') setView('main');
+    }
+  });
+
+  $('#addServiceBtn').addEventListener('click', () => setView('add'));
+  $('#emptyAdd').addEventListener('click', () => setView('add'));
+  $('#deleteBtn').addEventListener('click', openDelete);
+  $('#toggleBtn').addEventListener('click', toggleSelected);
+  $('#settingsBtn').addEventListener('click', () => setView('settings'));
+  $('#closeAdd').addEventListener('click', () => setView('main'));
+  $('#cancelAdd').addEventListener('click', () => setView('main'));
+  $('#closeSettings').addEventListener('click', () => setView('main'));
+  $('#settingsDone').addEventListener('click', () => setView('main'));
+  $('#cancelDelete').addEventListener('click', closeDelete);
+  $('#confirmDelete').addEventListener('click', confirmDelete);
+
+  $('#editConn').addEventListener('click', () => {
+    if (!current()) return;
+    editingConn = true;
+    renderDetail();
+  });
+  $('#doneConn').addEventListener('click', () => {
+    const s = current();
+    if (!s) return;
+    const parsed = parseAddress($('#connURL').value);
+    if (!parsed) { toast('地址格式不正确'); return; }
+    s.scheme = parsed.scheme;
+    s.host = parsed.host;
+    s.port = parsed.port;
+    s.path = parsed.path;
+    s.transport = $('#jumpSwitch').classList.contains('on') ? 'ssh' : 'direct';
+    s.jump = $('#jumpHost').value.trim();
+    if (s.transport === 'ssh') s.localPort = Number($('#localPort').value) || s.localPort || nextPort();
+    editingConn = false;
+    renderAll();
+    toast(`已保存「${s.name}」的连接设置`);
+  });
+  $('#jumpSwitch').addEventListener('click', () => {
+    const s = current();
+    if (!s) return;
+    const on = !$('#jumpSwitch').classList.contains('on');
+    $('#jumpSwitch').classList.toggle('on', on);
+    $('#jumpSwitch').setAttribute('aria-checked', String(on));
+    $('#connCard').classList.toggle('jump', on);
+    if (on && !s.localPort) $('#localPort').value = nextPort();
+    $('#cmdText').textContent = sshCommand({ ...s, transport: on ? 'ssh' : 'direct', localPort: Number($('#localPort').value) || s.localPort });
+  });
+  $('#copyCmd').addEventListener('click', () => {
+    if (!current()) return;
+    navigator.clipboard?.writeText($('#cmdText').textContent);
+    toast('已复制 SSH 命令');
+  });
+  $('#copyBase').addEventListener('click', () => {
+    const s = current();
+    if (!s) return;
+    navigator.clipboard?.writeText(endpoint(s));
+    toast('已复制 API 地址');
+  });
+  $('#testBtn').addEventListener('click', () => {
+    const s = current();
+    if (!s) return;
+    if (!s.enabled) { toast('请先启用这个服务'); return; }
+    s.latency = 20 + Math.round(Math.random() * 15);
+    s.history = s.history.concat([s.latency]).slice(-20);
+    renderAll();
+    toast(`连接正常 · ${s.latency} ms`);
+  });
+  $('#eyeBtn').addEventListener('click', () => {
+    const input = $('#apiKey');
+    const show = input.type === 'password';
+    input.type = show ? 'text' : 'password';
+    $('#eyeIcon').setAttribute('href', show ? '#i-eye-off' : '#i-eye');
+  });
+
+  function previewAdd() {
+    const parsed = parseAddress($('#addURL').value);
+    if (!parsed) {
+      $('#previewType').textContent = '等待地址';
+      $('#previewURL').textContent = 'https://api.example.com/v1';
+      return;
+    }
+    const defaultPort = (parsed.scheme === 'https' && parsed.port === 443) || (parsed.scheme === 'http' && parsed.port === 80);
+    $('#previewType').textContent = '直连';
+    $('#previewURL').textContent = `${parsed.scheme}://${parsed.host}${defaultPort ? '' : ':' + parsed.port}${parsed.path}`;
+  }
+  $('#addURL').addEventListener('input', previewAdd);
+  $('#confirmAdd').addEventListener('click', () => {
+    const parsed = parseAddress($('#addURL').value);
+    if (!parsed) { toast('请填写完整的 API 地址'); return; }
+    const id = 's' + Date.now();
+    services.push({
+      id, name: parsed.host, transport: 'direct', scheme: parsed.scheme, host: parsed.host,
+      port: parsed.port, path: parsed.path, localPort: null, jump: '',
+      enabled: true, latency: 30 + Math.round(Math.random() * 40),
+      history: [42, 38, 35, 40, 36, 34, 37, 35, 39, 36], key: $('#addKey').value || ''
+    });
+    selectedIDs = [id];
+    primaryID = id;
+    anchorID = id;
+    editingConn = false;
+    $('#addURL').value = '';
+    $('#addKey').value = '';
+    previewAdd();
+    renderAll();
+    setView('main');
+    const added = services.find((s) => s.id === id);
+    toast(`已添加并测试「${added.name}」· ${added.latency} ms`);
+  });
+
+  $('#modeSeg').addEventListener('click', (e) => {
+    const b = e.target.closest('[data-mode]');
+    if (!b) return;
+    mode = b.dataset.mode;
+    $$('#modeSeg button').forEach((x) => x.classList.toggle('on', x.dataset.mode === mode));
+    $('#modeName').textContent = mode === 'parallel' ? '同时运行多个服务' : '只运行当前服务';
+    toast(mode === 'parallel' ? '已切换为同时运行' : '已切换为单路模式');
+  });
+  $('#useLocal').addEventListener('click', () => toast('已切换到本机位置（示意）'));
+  $('#chooseFolder').addEventListener('click', () => toast('将打开文件夹选择（示意）'));
+  $('#reloadConfig').addEventListener('click', () => toast('已重新载入配置（示意）'));
+
+  $('#themeBtn').addEventListener('click', () => {
+    const dark = document.documentElement.dataset.theme !== 'dark';
+    document.documentElement.dataset.theme = dark ? 'dark' : 'light';
+    $('#themeIcon').setAttribute('href', dark ? '#i-sun' : '#i-moon');
+  });
+  $('#searchInput').addEventListener('input', () => {
+    const q = $('#searchInput').value.trim().toLowerCase();
+    $$('#serviceList .row').forEach((row) => {
+      const s = services.find((x) => x.id === row.dataset.select);
+      row.style.display = s && (`${s.name} ${s.host}`.toLowerCase().includes(q)) ? '' : 'none';
+    });
+  });
+  window.addEventListener('resize', fit);
+
+  previewAdd();
+  renderAll();
+  fit();
+})();
+</script>
+</body>
+</html>

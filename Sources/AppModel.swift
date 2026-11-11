@@ -6,6 +6,8 @@ import Combine
 final class AppModel: ObservableObject {
     @Published private(set) var configuration: AppConfiguration
     @Published var selectedID: UUID?
+    @Published private(set) var selectedIDs: Set<UUID> = []
+    private var selectionAnchorID: UUID?
     @Published var searchText: String = ""
     @Published private(set) var runtimes: [UUID: BackendRuntime] = [:]
     @Published private(set) var apiKeys: [UUID: String] = [:]
@@ -66,6 +68,10 @@ final class AppModel: ObservableObject {
         }
 
         selectedID = configuration.backends.first?.id
+        if let selectedID {
+            selectedIDs = [selectedID]
+            selectionAnchorID = selectedID
+        }
         for backend in configuration.backends {
             if let key = KeychainStore.read(account: backend.id.uuidString) {
                 apiKeys[backend.id] = key
@@ -245,13 +251,29 @@ final class AppModel: ObservableObject {
 
     // MARK: - Selection and editing
 
-    func select(_ id: UUID) {
-        guard configuration.backend(id: id) != nil else { return }
+    func select(_ id: UUID, extending: Bool = false, within order: [UUID]? = nil) {
+        guard configuration.index(id: id) != nil else { return }
+        let ids = order ?? configuration.backends.map(\.id)
+        guard let targetIndex = ids.firstIndex(of: id) else { return }
+        if extending,
+           let anchor = selectionAnchorID,
+           let anchorIndex = ids.firstIndex(of: anchor) {
+            let low = min(anchorIndex, targetIndex)
+            let high = max(anchorIndex, targetIndex)
+            selectedIDs = Set(ids[low...high])
+        } else {
+            selectedIDs = [id]
+            selectionAnchorID = id
+        }
         selectedID = id
     }
 
+    var selectedBackends: [Backend] {
+        configuration.backends.filter { selectedIDs.contains($0.id) }
+    }
+
     func openMainWindow(select id: UUID? = nil) {
-        if let id { selectedID = id }
+        if let id { select(id) }
         onOpenWindow?(id)
     }
 
@@ -305,6 +327,8 @@ final class AppModel: ObservableObject {
             if let keep, let index = configuration.index(id: keep) {
                 configuration.backends[index].enabled = true
                 selectedID = keep
+                selectedIDs = [keep]
+                selectionAnchorID = keep
                 startBackend(keep)
             }
         } else {
@@ -330,6 +354,8 @@ final class AppModel: ObservableObject {
                         }
                     }
                     selectedID = id
+                    selectedIDs = [id]
+                    selectionAnchorID = id
                 }
                 configuration.backends[index] = backend
                 scheduleSave()
@@ -408,9 +434,93 @@ final class AppModel: ObservableObject {
         }
         configuration.backends.append(backend)
         selectedID = backend.id
+        selectedIDs = [backend.id]
+        selectionAnchorID = backend.id
         runtimes[backend.id] = BackendRuntime()
         scheduleSave()
         showToast(transport == .ssh ? "已添加 SSH 后端，填写地址后启用" : "已添加直连后端，填写地址后启用")
+    }
+
+    @discardableResult
+    func addService(address: String, key: String) throws -> Backend {
+        guard let parsed = ServiceAddress.parse(address) else {
+            throw BackendError.invalid("请填写完整的 API 地址")
+        }
+        let candidate = Backend(
+            name: parsed.host,
+            transport: .direct,
+            scheme: parsed.scheme,
+            host: parsed.host,
+            port: parsed.port,
+            apiPath: parsed.path,
+            localPort: nil,
+            sshTarget: "",
+            enabled: true
+        )
+        let backend = try candidate.validated()
+        configuration.backends.append(backend)
+        selectedID = backend.id
+        selectedIDs = [backend.id]
+        selectionAnchorID = backend.id
+        runtimes[backend.id] = BackendRuntime()
+        if configuration.mode == .single {
+            for other in configuration.backends where other.id != backend.id && other.enabled {
+                setEnabled(false, for: other.id)
+            }
+        }
+        if !key.isEmpty {
+            setAPIKey(key, for: backend.id)
+        }
+        scheduleSave()
+        startBackend(backend.id)
+        showToast("已添加并测试「\(backend.name)」")
+        return backend
+    }
+
+    func deleteSelected() {
+        let ids = selectedIDs
+        guard !ids.isEmpty else { return }
+        let firstIndex = configuration.backends.firstIndex { ids.contains($0.id) } ?? 0
+        let removed = configuration.backends.filter { ids.contains($0.id) }.count
+        for id in ids {
+            if configuration.backend(id: id)?.enabled == true { stopBackend(id) }
+            keySaveTasks[id]?.cancel()
+            keySaveTasks[id] = nil
+            KeychainStore.delete(account: id.uuidString)
+            apiKeys.removeValue(forKey: id)
+            runtimes.removeValue(forKey: id)
+        }
+        configuration.backends.removeAll { ids.contains($0.id) }
+        let next: Backend?
+        if configuration.backends.isEmpty {
+            next = nil
+        } else if firstIndex < configuration.backends.count {
+            next = configuration.backends[firstIndex]
+        } else {
+            next = configuration.backends.last
+        }
+        selectedID = next?.id
+        selectedIDs = next.map { Set([$0.id]) } ?? []
+        selectionAnchorID = next?.id
+        scheduleSave()
+        showToast(removed == 1 ? "已删除 1 个服务" : "已删除 \(removed) 个服务")
+    }
+
+    func toggleSelectedEnabled() {
+        let selected = selectedBackends
+        guard !selected.isEmpty else { return }
+        let allOn = selected.allSatisfy(\.enabled)
+        if !allOn && configuration.mode == .single {
+            if let primary = selectedID ?? selected.first?.id {
+                setEnabled(true, for: primary)
+            }
+            showToast("单路模式只启用当前服务")
+            return
+        }
+        for backend in selected {
+            setEnabled(!allOn, for: backend.id)
+        }
+        showToast(allOn ? "已禁用 \(selected.count) 个服务" : "已启用 \(selected.count) 个服务")
     }
 
     func deleteBackend(_ id: UUID) {
@@ -419,7 +529,18 @@ final class AppModel: ObservableObject {
         runtimes.removeValue(forKey: id)
         apiKeys.removeValue(forKey: id)
         KeychainStore.delete(account: id.uuidString)
-        if selectedID == id { selectedID = configuration.backends.first?.id }
+        selectedIDs.remove(id)
+        if selectedID == id {
+            if let next = configuration.backends.first {
+                selectedID = next.id
+                selectedIDs = [next.id]
+                selectionAnchorID = next.id
+            } else {
+                selectedID = nil
+                selectedIDs = []
+                selectionAnchorID = nil
+            }
+        }
         scheduleSave()
         showToast("已删除后端")
     }
@@ -536,6 +657,13 @@ final class AppModel: ObservableObject {
         let sanitized = loaded.sanitized()
         configuration = sanitized
         selectedID = sanitized.backends.first?.id
+        if let selectedID {
+            selectedIDs = [selectedID]
+            selectionAnchorID = selectedID
+        } else {
+            selectedIDs = []
+            selectionAnchorID = nil
+        }
 
         var newRuntimes: [UUID: BackendRuntime] = [:]
         var newKeys: [UUID: String] = [:]

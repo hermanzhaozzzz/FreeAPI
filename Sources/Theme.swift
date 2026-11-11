@@ -23,27 +23,39 @@ extension Color {
         })
     }
 
-    static let ink = Color(light: 0x1F1E1D, dark: 0xF5F1E8)
-    static let ink2 = Color(light: 0x5D584F, dark: 0xC2B9AA)
-    static let ink3 = Color(light: 0x8D8578, dark: 0x8E8477)
-    static let accent = Color(light: 0xB85C38, dark: 0xE29170)
-    static let accentBright = Color(light: 0xD97757, dark: 0xF0A184)
-    static let ok = Color(light: 0x4F8A63, dark: 0x7FC08F)
-    static let okInk = Color(light: 0x37694A, dark: 0xA6D9B4)
-    static let warn = Color(light: 0xB57B22, dark: 0xE6B25C)
-    static let warnInk = Color(light: 0x8A5A12, dark: 0xF0CE93)
-    static let bad = Color(light: 0xB8483A, dark: 0xE07868)
-    static let badInk = Color(light: 0x943329, dark: 0xF0A79D)
+    // LiquidBar flat palette
+    static let canvas = Color(light: 0xF7F5EF, dark: 0x1A1917)
+    static let surface = Color(light: 0xFDFCF8, dark: 0x24221F)
+    static let surfaceMuted = Color(light: 0xF0EDE3, dark: 0x2C2A26)
+    static let surfaceStrong = Color(light: 0xE9E5D9, dark: 0x35322D)
+    static let border = Color(light: 0xE3DFD2, dark: 0x3A3731)
 
-    static let hairline = Color(light: 0x1F1E1D, dark: 0xFFF6E8, lightAlpha: 0.09, darkAlpha: 0.10)
-    static let hairlineStrong = Color(light: 0x1F1E1D, dark: 0xFFF6E8, lightAlpha: 0.16, darkAlpha: 0.18)
-    static let fieldFill = Color(light: 0xFFFFFF, dark: 0xFFFFFF, lightAlpha: 0.62, darkAlpha: 0.07)
-    static let selectionFill = Color(light: 0xFFFFFF, dark: 0xFFFFFF, lightAlpha: 0.74, darkAlpha: 0.13)
-    static let panelTint = Color(light: 0xFFFCF5, dark: 0x25221E, lightAlpha: 0.55, darkAlpha: 0.5)
-    static let codeFill = Color(light: 0x483726, dark: 0x000000, lightAlpha: 0.06, darkAlpha: 0.26)
-    static let glassStroke = Color(light: 0xFFFFFF, dark: 0xFFFFFF, lightAlpha: 0.45, darkAlpha: 0.12)
-    static let buttonInk = Color(light: 0x2B1A12, dark: 0x2B1A12)
-    static let sidebarTint = Color(light: 0xFFFFFF, dark: 0xFFFFFF, lightAlpha: 0.16, darkAlpha: 0.035)
+    static let ink = Color(light: 0x23211D, dark: 0xF1EEE5)
+    static let ink2 = Color(light: 0x6F6A60, dark: 0xACA79C)
+    static let ink3 = Color(light: 0x99948A, dark: 0x807B71)
+
+    static let accent = Color(light: 0xC2603F, dark: 0xE08A6B)
+    static let accentBright = Color(light: 0xD97757, dark: 0xD97757)
+    static let accentSoft = Color(light: 0xF6E4DB, dark: 0x3B2C26)
+    static let onAccent = Color(light: 0xFFF9F5, dark: 0xFFF9F5)
+
+    static let ok = Color(light: 0x2F6F5E, dark: 0x7CC3A7)
+    static let okInk = Color(light: 0x2F6F5E, dark: 0x7CC3A7)
+    static let warn = Color(light: 0xA9611F, dark: 0xE5AE6B)
+    static let warnInk = Color(light: 0xA9611F, dark: 0xE5AE6B)
+    static let bad = Color(light: 0xA83224, dark: 0xF0806A)
+    static let badInk = Color(light: 0xA83224, dark: 0xF0806A)
+
+    // Legacy names kept for existing views.
+    static let hairline = Color(light: 0xE3DFD2, dark: 0x3A3731)
+    static let hairlineStrong = Color(light: 0xD8D2C3, dark: 0x4A463E)
+    static let fieldFill = Color(light: 0xFDFCF8, dark: 0x24221F)
+    static let selectionFill = Color(light: 0xF6E4DB, dark: 0x3B2C26)
+    static let panelTint = Color(light: 0xFDFCF8, dark: 0x24221F)
+    static let codeFill = Color(light: 0xF0EDE3, dark: 0x2C2A26)
+    static let glassStroke = Color(light: 0xE3DFD2, dark: 0x3A3731)
+    static let buttonInk = Color(light: 0xFFF9F5, dark: 0xFFF9F5)
+    static let sidebarTint = Color(light: 0xF7F5EF, dark: 0x1A1917)
 }
 
 extension ConnectionState {
@@ -66,88 +78,42 @@ extension ConnectionState {
     }
 }
 
+enum Typography {
+    static func wordmark(_ size: CGFloat = 16) -> Font {
+        .system(size: size, weight: .semibold, design: .serif)
+    }
+
+    static func display(_ size: CGFloat = 24) -> Font {
+        .system(size: size, weight: .semibold, design: .serif)
+    }
+
+    static func numeral(_ size: CGFloat, weight: Font.Weight = .semibold) -> Font {
+        .system(size: size, weight: weight, design: .rounded).monospacedDigit()
+    }
+}
+
 struct AuroraBackground: View {
-    @Environment(\.colorScheme) private var scheme
-
     var body: some View {
-        GeometryReader { proxy in
-            let width = proxy.size.width
-            let height = proxy.size.height
-
-            ZStack {
-                LinearGradient(
-                    colors: scheme == .dark
-                        ? [
-                            Color(red: 0.11, green: 0.10, blue: 0.09),
-                            Color(red: 0.10, green: 0.09, blue: 0.07),
-                            Color(red: 0.07, green: 0.06, blue: 0.05)
-                        ]
-                        : [
-                            Color(red: 0.988, green: 0.980, blue: 0.961),
-                            Color(red: 0.969, green: 0.949, blue: 0.910),
-                            Color(red: 0.949, green: 0.922, blue: 0.871)
-                        ],
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                )
-
-                Circle()
-                    .fill(Color(light: 0xF1CFB0, dark: 0x6B3A25))
-                    .frame(width: width * 0.78, height: width * 0.78)
-                    .blur(radius: 92)
-                    .offset(x: -width * 0.32, y: -height * 0.38)
-                    .opacity(scheme == .dark ? 0.55 : 0.55)
-
-                Circle()
-                    .fill(Color(light: 0xE6C0AE, dark: 0x4A2B24))
-                    .frame(width: width * 0.66, height: width * 0.66)
-                    .blur(radius: 92)
-                    .offset(x: width * 0.34, y: -height * 0.34)
-                    .opacity(scheme == .dark ? 0.50 : 0.38)
-
-                Circle()
-                    .fill(Color(light: 0xD9D0B2, dark: 0x3F3A24))
-                    .frame(width: width * 0.82, height: width * 0.82)
-                    .blur(radius: 92)
-                    .offset(x: width * 0.34, y: height * 0.46)
-                    .opacity(scheme == .dark ? 0.42 : 0.40)
-
-                Circle()
-                    .fill(Color(light: 0xC3D2B8, dark: 0x2B3A2C))
-                    .frame(width: width * 0.56, height: width * 0.56)
-                    .blur(radius: 92)
-                    .offset(x: -width * 0.36, y: height * 0.42)
-                    .opacity(scheme == .dark ? 0.36 : 0.32)
-            }
-            .frame(width: width, height: height)
-            .clipped()
-        }
-        .ignoresSafeArea()
-        .allowsHitTesting(false)
+        Color.canvas.ignoresSafeArea()
     }
 }
 
 struct GlassCard<Content: View>: View {
-    var cornerRadius: CGFloat = 14
-    var padding: CGFloat = 12
-    @Environment(\.colorScheme) private var scheme
+    var cornerRadius: CGFloat = 12
+    var padding: CGFloat = 14
     @ViewBuilder var content: Content
 
     var body: some View {
         content
             .padding(padding)
-            .background {
+            .background(
                 RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                    .fill(.ultraThinMaterial)
-                    .overlay {
-                        RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                            .fill(Color.panelTint.opacity(scheme == .dark ? 0.18 : 0.36))
-                    }
-            }
-            .overlay {
+                    .fill(Color.surface)
+            )
+            .overlay(
                 RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                    .strokeBorder(Color.glassStroke, lineWidth: 1)
-            }
+                    .strokeBorder(Color.border, lineWidth: 1)
+            )
     }
 }
 
@@ -160,17 +126,17 @@ struct GlassTextField: View {
     var body: some View {
         TextField(placeholder, text: $text)
             .textFieldStyle(.plain)
-            .font(.system(size: mono ? 10.5 : 11.5, design: mono ? .monospaced : .default))
+            .font(.system(size: mono ? 10.5 : 12, design: mono ? .monospaced : .default))
             .focused($focused)
             .padding(.horizontal, 9)
-            .frame(height: 31)
+            .frame(height: 33)
             .background(
-                RoundedRectangle(cornerRadius: 8, style: .continuous)
-                    .fill(Color.fieldFill)
+                RoundedRectangle(cornerRadius: 7, style: .continuous)
+                    .fill(Color.surface)
             )
             .overlay(
-                RoundedRectangle(cornerRadius: 8, style: .continuous)
-                    .strokeBorder(focused ? Color.accent.opacity(0.55) : Color.hairline, lineWidth: focused ? 1.2 : 0.8)
+                RoundedRectangle(cornerRadius: 7, style: .continuous)
+                    .strokeBorder(focused ? Color.accent.opacity(0.55) : Color.border, lineWidth: focused ? 1.2 : 1)
             )
     }
 }
@@ -185,14 +151,14 @@ struct GlassNumberField: View {
             .font(.system(size: 10.5, design: .monospaced))
             .focused($focused)
             .padding(.horizontal, 9)
-            .frame(height: 31)
+            .frame(height: 33)
             .background(
-                RoundedRectangle(cornerRadius: 8, style: .continuous)
-                    .fill(Color.fieldFill)
+                RoundedRectangle(cornerRadius: 7, style: .continuous)
+                    .fill(Color.surface)
             )
             .overlay(
-                RoundedRectangle(cornerRadius: 8, style: .continuous)
-                    .strokeBorder(focused ? Color.accent.opacity(0.55) : Color.hairline, lineWidth: focused ? 1.2 : 0.8)
+                RoundedRectangle(cornerRadius: 7, style: .continuous)
+                    .strokeBorder(focused ? Color.accent.opacity(0.55) : Color.border, lineWidth: focused ? 1.2 : 1)
             )
     }
 }
@@ -235,7 +201,7 @@ struct StatusDot: View {
         ZStack {
             if state != .off {
                 Circle()
-                    .fill(state.statusColor.opacity(0.18))
+                    .fill(state.statusColor.opacity(0.14))
                     .frame(width: size + 6, height: size + 6)
                     .scaleEffect(state == .connecting && pulse ? 1.15 : 1)
             }
@@ -266,7 +232,7 @@ struct StatusChip: View {
         .foregroundStyle(state.statusInk)
         .padding(.horizontal, 8)
         .frame(height: 20)
-        .background(Capsule().fill(state.statusColor.opacity(0.13)))
+        .background(Capsule().fill(state.statusColor.opacity(0.12)))
         .overlay(Capsule().strokeBorder(state.statusColor.opacity(0.18), lineWidth: 0.5))
     }
 }
@@ -309,13 +275,7 @@ struct Sparkline: View {
 
             ZStack {
                 areaPath(points, size: size)
-                    .fill(
-                        LinearGradient(
-                            colors: [color.opacity(0.22), color.opacity(0)],
-                            startPoint: .top,
-                            endPoint: .bottom
-                        )
-                    )
+                    .fill(color.opacity(0.10))
                 linePath(points)
                     .stroke(color, style: StrokeStyle(lineWidth: 1.6, lineCap: .round, lineJoin: .round))
             }
@@ -357,12 +317,12 @@ struct ToastOverlay: View {
         if let text {
             Text(text)
                 .font(.system(size: 11.5, weight: .medium))
-                .foregroundStyle(Color.white)
+                .foregroundStyle(Color.onAccent)
                 .padding(.horizontal, 15)
                 .padding(.vertical, 9)
-                .background(Capsule().fill(Color.black.opacity(0.78)))
+                .background(Capsule().fill(Color(light: 0x23211D, dark: 0x3A3731)))
                 .overlay(Capsule().strokeBorder(Color.white.opacity(0.08), lineWidth: 0.5))
-                .shadow(color: .black.opacity(0.25), radius: 12, y: 6)
+                .shadow(color: .black.opacity(0.18), radius: 12, y: 6)
                 .padding(.bottom, 18)
                 .transition(.move(edge: .bottom).combined(with: .opacity))
         }
@@ -372,23 +332,13 @@ struct ToastOverlay: View {
 struct PrimaryButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .font(.system(size: 10.5, weight: .semibold))
-            .foregroundStyle(Color.buttonInk)
-            .padding(.horizontal, 12)
-            .frame(height: 27)
+            .font(.system(size: 12, weight: .semibold))
+            .foregroundStyle(Color.onAccent)
+            .padding(.horizontal, 13)
+            .frame(height: 30)
             .background(
                 RoundedRectangle(cornerRadius: 8, style: .continuous)
-                    .fill(
-                        LinearGradient(
-                            colors: [Color.accentBright, Color.accent],
-                            startPoint: .top,
-                            endPoint: .bottom
-                        )
-                    )
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 8, style: .continuous)
-                    .strokeBorder(Color.white.opacity(0.24), lineWidth: 0.5)
+                    .fill(Color.accentBright)
             )
             .opacity(configuration.isPressed ? 0.82 : 1)
     }
@@ -397,17 +347,17 @@ struct PrimaryButtonStyle: ButtonStyle {
 struct SecondaryButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .font(.system(size: 11, weight: .semibold))
-            .foregroundStyle(Color.ink2)
-            .padding(.horizontal, 11)
+            .font(.system(size: 12, weight: .medium))
+            .foregroundStyle(Color.ink)
+            .padding(.horizontal, 12)
             .frame(height: 30)
             .background(
-                RoundedRectangle(cornerRadius: 9, style: .continuous)
-                    .fill(Color.fieldFill)
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .fill(Color.surfaceMuted)
             )
             .overlay(
-                RoundedRectangle(cornerRadius: 9, style: .continuous)
-                    .strokeBorder(Color.hairline, lineWidth: 0.8)
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .strokeBorder(Color.border, lineWidth: 1)
             )
             .opacity(configuration.isPressed ? 0.8 : 1)
     }
@@ -420,14 +370,35 @@ struct IconButtonStyle: ButtonStyle {
             .foregroundStyle(Color.ink2)
             .frame(width: 30, height: 30)
             .background(
-                RoundedRectangle(cornerRadius: 9, style: .continuous)
-                    .fill(Color.fieldFill)
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .fill(Color.surface)
             )
             .overlay(
-                RoundedRectangle(cornerRadius: 9, style: .continuous)
-                    .strokeBorder(Color.hairline, lineWidth: 0.8)
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .strokeBorder(Color.border, lineWidth: 1)
             )
             .opacity(configuration.isPressed ? 0.8 : 1)
+    }
+}
+
+struct SidebarActionButtonStyle: ButtonStyle {
+    var prominent: Bool = false
+    @Environment(\.isEnabled) private var isEnabled
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .font(.system(size: 13, weight: .semibold))
+            .foregroundStyle(prominent ? Color.onAccent : Color.ink2)
+            .frame(width: 30, height: 30)
+            .background(
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .fill(prominent ? Color.accentBright : Color.surface)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .strokeBorder(prominent ? Color.clear : Color.border, lineWidth: 1)
+            )
+            .opacity(!isEnabled ? 0.35 : (configuration.isPressed ? 0.8 : 1))
     }
 }
 

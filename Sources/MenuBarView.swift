@@ -21,19 +21,7 @@ struct MenuBarView: View {
         }
         .padding(12)
         .frame(width: Self.width, height: Self.preferredHeight(rowCount: model.backends.count), alignment: .top)
-        .background {
-            ZStack {
-                Rectangle().fill(.ultraThinMaterial)
-                LinearGradient(
-                    colors: [
-                        Color(light: 0xFFF8EE, dark: 0x2A2520).opacity(0.62),
-                        Color(light: 0xF7EFE2, dark: 0x211D19).opacity(0.55)
-                    ],
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                )
-            }
-        }
+        .background(Color.canvas)
         .overlay(alignment: .bottom) {
             ToastOverlay(text: model.toast)
                 .padding(.bottom, 4)
@@ -58,7 +46,7 @@ struct MenuBarView: View {
 
             VStack(alignment: .leading, spacing: 1) {
                 Text("FreeAPI")
-                    .font(.system(size: 13, weight: .semibold))
+                    .font(Typography.wordmark(14))
                     .foregroundStyle(Color.ink)
                 Text("本地 API 网关")
                     .font(.system(size: 9.5))

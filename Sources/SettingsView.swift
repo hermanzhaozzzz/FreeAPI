@@ -1,76 +1,50 @@
 import SwiftUI
+import AppKit
 
 struct SettingsView: View {
     @ObservedObject var model: AppModel
     @Environment(\.dismiss) private var dismiss
-    @State private var pendingAction: SettingsPendingAction?
+    @State private var pendingRestore: ConfigBackup?
 
     var body: some View {
         VStack(spacing: 0) {
             header
             ScrollView {
-                VStack(alignment: .leading, spacing: 22) {
-                    backendsSection
-                    backupsSection
+                VStack(alignment: .leading, spacing: 18) {
                     storageSection
+                    backupsSection
+                    modeSection
                 }
-                .padding(.horizontal, 24)
-                .padding(.vertical, 18)
+                .padding(22)
             }
             footer
         }
-        .frame(width: 760, height: 660)
-        .background {
-            ZStack {
-                AuroraBackground()
-                Rectangle().fill(.ultraThinMaterial)
-            }
-        }
+        .frame(width: 680, height: 620)
+        .background(Color.canvas)
         .overlay(alignment: .bottom) {
             ToastOverlay(text: model.toast)
                 .padding(.bottom, 58)
         }
         .animation(.easeInOut(duration: 0.2), value: model.toast)
-        .alert(item: $pendingAction) { action in
-            switch action {
-            case .delete(let backend):
-                return Alert(
-                    title: Text("删除后端？"),
-                    message: Text("“\(backend.name)”和它在钥匙串中的 API Key 会一起删除。"),
-                    primaryButton: .destructive(Text("删除")) {
-                        model.deleteBackend(backend.id)
-                    },
-                    secondaryButton: .cancel()
-                )
-            case .restore(let backup):
-                return Alert(
-                    title: Text("恢复这份备份？"),
-                    message: Text("\(model.backupTimeText(backup.createdAt)) · \(backup.summary)\n当前配置会先保存为一份备份。"),
-                    primaryButton: .destructive(Text("恢复")) {
-                        model.restoreBackup(backup)
-                    },
-                    secondaryButton: .cancel()
-                )
-            }
+        .alert(item: $pendingRestore) { backup in
+            Alert(
+                title: Text("恢复这份备份？"),
+                message: Text("\(model.backupTimeText(backup.createdAt)) · \(backup.summary)\n当前配置会先保存为一份备份。"),
+                primaryButton: .destructive(Text("恢复")) {
+                    model.restoreBackup(backup)
+                },
+                secondaryButton: .cancel(Text("取消"))
+            )
         }
     }
 
     private var header: some View {
-        HStack(alignment: .center, spacing: 14) {
-            ZStack {
-                RoundedRectangle(cornerRadius: 10, style: .continuous)
-                    .fill(Color.accent.opacity(0.16))
-                Image(systemName: "slider.horizontal.3")
-                    .font(.system(size: 15, weight: .semibold))
-                    .foregroundStyle(Color.accent)
-            }
-            .frame(width: 34, height: 34)
-
-            VStack(alignment: .leading, spacing: 2) {
-                Text("高级设置")
-                    .font(.system(size: 18, weight: .semibold))
+        HStack(alignment: .top, spacing: 12) {
+            VStack(alignment: .leading, spacing: 3) {
+                Text("设置")
+                    .font(Typography.display(20))
                     .foregroundStyle(Color.ink)
-                Text("集中管理所有后端和配置存储")
+                Text("配置存储、备份和运行模式这些不常改的选项放在这里。")
                     .font(.system(size: 10.5))
                     .foregroundStyle(Color.ink3)
             }
@@ -84,160 +58,23 @@ struct SettingsView: View {
             .buttonStyle(IconButtonStyle())
             .help("关闭")
         }
-        .padding(.horizontal, 24)
+        .padding(.horizontal, 22)
         .padding(.top, 20)
         .padding(.bottom, 10)
-    }
-
-    private var backendsSection: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack(alignment: .bottom, spacing: 12) {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("后端管理")
-                        .font(.system(size: 13, weight: .semibold))
-                        .foregroundStyle(Color.ink)
-                    Text("集中添加、启停和删除；SSH 隧道与直连都在这里。")
-                        .font(.system(size: 10.5))
-                        .foregroundStyle(Color.ink3)
-                }
-                Spacer(minLength: 8)
-                HStack(spacing: 7) {
-                    Button {
-                        add(.ssh)
-                    } label: {
-                        HStack(spacing: 5) {
-                            Image(systemName: "plus")
-                            Text("添加 SSH")
-                        }
-                    }
-                    .buttonStyle(PrimaryButtonStyle())
-
-                    Button {
-                        add(.direct)
-                    } label: {
-                        HStack(spacing: 5) {
-                            Image(systemName: "plus")
-                            Text("添加直连")
-                        }
-                    }
-                    .buttonStyle(SecondaryButtonStyle())
-                }
-            }
-
-            GlassCard(cornerRadius: 14, padding: 0) {
-                if model.backends.isEmpty {
-                    VStack(spacing: 6) {
-                        Text("还没有后端")
-                            .font(.system(size: 12, weight: .semibold))
-                            .foregroundStyle(Color.ink2)
-                        Text("用右上角的按钮添加 SSH 隧道或直连后端。")
-                            .font(.system(size: 10.5))
-                            .foregroundStyle(Color.ink3)
-                    }
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 28)
-                } else {
-                    VStack(spacing: 0) {
-                        ForEach(Array(model.backends.enumerated()), id: \.element.id) { index, backend in
-                            backendRow(backend)
-                            if index < model.backends.count - 1 {
-                                Rectangle()
-                                    .fill(Color.hairline)
-                                    .frame(height: 1)
-                                    .padding(.leading, 42)
-                            }
-                        }
-                    }
-                }
-            }
-
-            Text("“编辑”会回到主窗口修改地址、协议、本地端口和 API Key。")
-                .font(.system(size: 9.5))
-                .foregroundStyle(Color.ink3)
-        }
-    }
-
-    private func backendRow(_ backend: Backend) -> some View {
-        HStack(spacing: 10) {
-            StatusDot(state: model.state(for: backend))
-
-            VStack(alignment: .leading, spacing: 3) {
-                Text(backend.name)
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundStyle(Color.ink)
-                    .lineLimit(1)
-                HStack(spacing: 6) {
-                    TagPill(transport: backend.transport)
-                    Text(backend.host.isEmpty ? "未填写地址" : backend.upstreamAddress)
-                        .font(.system(size: 9.5, design: .monospaced))
-                        .foregroundStyle(Color.ink3)
-                        .lineLimit(1)
-                    if backend.transport == .ssh {
-                        Text("→ \(backend.localAddress)")
-                            .font(.system(size: 9.5, design: .monospaced))
-                            .foregroundStyle(Color.ink3)
-                            .lineLimit(1)
-                    }
-                }
-            }
-
-            Spacer(minLength: 8)
-
-            Text(model.latencyText(for: backend))
-                .font(.system(size: 9.5, design: .monospaced))
-                .foregroundStyle(latencyColor(backend))
-                .frame(width: 50, alignment: .trailing)
-
-            Toggle("", isOn: Binding(
-                get: { model.backend(id: backend.id)?.enabled ?? backend.enabled },
-                set: { model.setEnabled($0, for: backend.id) }
-            ))
-            .labelsHidden()
-            .toggleStyle(.switch)
-            .controlSize(.small)
-            .tint(Color.ok)
-
-            Button("编辑") {
-                model.select(backend.id)
-                dismiss()
-            }
-            .buttonStyle(SecondaryButtonStyle())
-
-            Button {
-                pendingAction = .delete(backend)
-            } label: {
-                Image(systemName: "trash")
-                    .font(.system(size: 11, weight: .medium))
-                    .foregroundStyle(Color.bad)
-                    .frame(width: 30, height: 30)
-                    .background(
-                        RoundedRectangle(cornerRadius: 9, style: .continuous)
-                            .fill(Color.fieldFill)
-                    )
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 9, style: .continuous)
-                            .strokeBorder(Color.hairline, lineWidth: 0.8)
-                    )
-            }
-            .buttonStyle(.plain)
-            .help("删除 \(backend.name)")
-        }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 9)
     }
 
     private var storageSection: some View {
         VStack(alignment: .leading, spacing: 10) {
             VStack(alignment: .leading, spacing: 2) {
                 Text("配置存储")
-                    .font(.system(size: 13, weight: .semibold))
+                    .font(.system(size: 12.5, weight: .semibold))
                     .foregroundStyle(Color.ink)
                 Text("配置会在修改后自动保存到当前位置；备份保留在本机。")
                     .font(.system(size: 10.5))
                     .foregroundStyle(Color.ink3)
             }
 
-            GlassCard(cornerRadius: 14, padding: 14) {
+            GlassCard(cornerRadius: 12, padding: 14) {
                 VStack(alignment: .leading, spacing: 12) {
                     HStack(spacing: 10) {
                         Image(systemName: model.isUsingICloudConfig ? "icloud" : "folder")
@@ -246,7 +83,7 @@ struct SettingsView: View {
                             .frame(width: 30, height: 30)
                             .background(
                                 RoundedRectangle(cornerRadius: 8, style: .continuous)
-                                    .fill(Color.accent.opacity(0.10))
+                                    .fill(Color.accentSoft)
                             )
                         VStack(alignment: .leading, spacing: 2) {
                             Text("当前位置")
@@ -263,14 +100,6 @@ struct SettingsView: View {
                         }
                         Spacer()
                     }
-
-                    HStack(spacing: 6) {
-                        Image(systemName: "clock.arrow.circlepath")
-                            .font(.system(size: 10))
-                        Text("上次备份：\(model.lastBackupText)")
-                            .font(.system(size: 9.5))
-                    }
-                    .foregroundStyle(Color.ink3)
 
                     HStack(spacing: 7) {
                         if !model.isUsingICloudConfig {
@@ -323,7 +152,7 @@ struct SettingsView: View {
             HStack(alignment: .firstTextBaseline, spacing: 12) {
                 VStack(alignment: .leading, spacing: 2) {
                     Text("配置备份")
-                        .font(.system(size: 13, weight: .semibold))
+                        .font(.system(size: 12.5, weight: .semibold))
                         .foregroundStyle(Color.ink)
                     Text("每次保存记录改动，最多保留 \(ConfigBackupStore.maxBackups) 份；恢复前会先保存当前配置。")
                         .font(.system(size: 10.5))
@@ -335,7 +164,7 @@ struct SettingsView: View {
                     .foregroundStyle(Color.ink3)
             }
 
-            GlassCard(cornerRadius: 14, padding: 0) {
+            GlassCard(cornerRadius: 12, padding: 0) {
                 if model.backups.isEmpty {
                     Text("暂无备份，修改配置后会自动生成。")
                         .font(.system(size: 10.5))
@@ -349,7 +178,7 @@ struct SettingsView: View {
                                 backupRow(backup)
                                 if index < model.backups.count - 1 {
                                     Rectangle()
-                                        .fill(Color.hairline)
+                                        .fill(Color.border)
                                         .frame(height: 1)
                                         .padding(.leading, 42)
                                 }
@@ -386,7 +215,7 @@ struct SettingsView: View {
             Spacer(minLength: 8)
 
             Button("恢复") {
-                pendingAction = .restore(backup)
+                pendingRestore = backup
             }
             .buttonStyle(SecondaryButtonStyle())
         }
@@ -394,10 +223,45 @@ struct SettingsView: View {
         .padding(.vertical, 8)
     }
 
+    private var modeSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text("运行模式")
+                    .font(.system(size: 12.5, weight: .semibold))
+                    .foregroundStyle(Color.ink)
+                Text("默认所有启用的服务同时运行。需要时再切到单路。")
+                    .font(.system(size: 10.5))
+                    .foregroundStyle(Color.ink3)
+            }
+
+            GlassCard(cornerRadius: 12, padding: 14) {
+                HStack(spacing: 12) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(model.mode == .parallel ? "同时运行多个服务" : "只运行当前服务")
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundStyle(Color.ink)
+                        Text(model.mode == .parallel ? "每个服务使用自己的本地端口" : "切换服务时自动停用其它服务")
+                            .font(.system(size: 9.5))
+                            .foregroundStyle(Color.ink3)
+                    }
+                    Spacer()
+                    Picker("", selection: Binding(get: { model.mode }, set: { model.setMode($0) })) {
+                        Text("同时").tag(RunMode.parallel)
+                        Text("单路").tag(RunMode.single)
+                    }
+                    .pickerStyle(.segmented)
+                    .labelsHidden()
+                    .controlSize(.small)
+                    .frame(width: 120)
+                }
+            }
+        }
+    }
+
     private var footer: some View {
         VStack(spacing: 0) {
             Rectangle()
-                .fill(Color.hairline)
+                .fill(Color.border)
                 .frame(height: 1)
             HStack {
                 Text("修改会在约 1.5 秒后保存并自动备份")
@@ -409,38 +273,12 @@ struct SettingsView: View {
                 }
                 .buttonStyle(PrimaryButtonStyle())
             }
-            .padding(.horizontal, 24)
+            .padding(.horizontal, 22)
             .padding(.vertical, 12)
         }
     }
 
     private var abbreviatedPath: String {
         (ConfigLocation.activeDirectory.path as NSString).abbreviatingWithTildeInPath
-    }
-
-    private func add(_ transport: BackendTransport) {
-        model.addBackend(transport: transport)
-        dismiss()
-    }
-
-    private func latencyColor(_ backend: Backend) -> Color {
-        switch model.state(for: backend) {
-        case .connected: return .ok
-        case .connecting, .degraded: return .warn
-        case .error: return .bad
-        case .off: return .ink3
-        }
-    }
-}
-
-private enum SettingsPendingAction: Identifiable {
-    case delete(Backend)
-    case restore(ConfigBackup)
-
-    var id: String {
-        switch self {
-        case .delete(let backend): return "delete-\(backend.id.uuidString)"
-        case .restore(let backup): return "restore-\(backup.id.uuidString)"
-        }
     }
 }

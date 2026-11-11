@@ -144,6 +144,38 @@ enum BackendError: LocalizedError {
     }
 }
 
+struct ServiceAddress {
+    let scheme: String
+    let host: String
+    let port: Int
+    let path: String
+
+    static func parse(_ raw: String) -> ServiceAddress? {
+        var value = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !value.isEmpty else { return nil }
+        if value.range(of: "^[a-zA-Z][a-zA-Z0-9+.-]*://", options: .regularExpression) == nil {
+            value = "https://" + value
+        }
+        guard let components = URLComponents(string: value),
+              let host = components.host,
+              !host.isEmpty else {
+            return nil
+        }
+        let scheme = components.scheme?.lowercased() == "http" ? "http" : "https"
+        var path = components.path
+        if path.isEmpty || path == "/" { path = "/v1" }
+        while path.count > 1 && path.hasSuffix("/") { path.removeLast() }
+        let port = components.port ?? (scheme == "https" ? 443 : 80)
+        guard (1...65535).contains(port) else { return nil }
+        return ServiceAddress(scheme: scheme, host: host, port: port, path: path)
+    }
+
+    var displayURL: String {
+        let defaultPort = (scheme == "https" && port == 443) || (scheme == "http" && port == 80)
+        return "\(scheme)://\(host)\(defaultPort ? "" : ":\(port)")\(path)"
+    }
+}
+
 struct AppConfiguration: Codable, Equatable {
     static let currentVersion = 2
 
