@@ -11,7 +11,7 @@ version=$(/usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" Resourc
 dmg_name="FreeAPI-${version}.dmg"
 dmg_path="$project_root/dist/$dmg_name"
 rw_dmg="$project_root/build/FreeAPI-rw.dmg"
-compressed_dmg="$project_root/build/FreeAPI-compressed.dmg"
+compressed_dmg="$project_root/build/FreeAPI-compressed-$$.dmg"
 staging="$(mktemp -d "$project_root/build/dmg-staging.XXXXXX")"
 
 if [[ ! -f Resources/dmg-background.png ]]; then
@@ -81,8 +81,23 @@ for _ in 1 2 3; do
     sleep 1
 done
 hdiutil detach "$mountpoint" -force >/dev/null 2>&1 || true
+if hdiutil info | grep -F "$mountpoint" >/dev/null 2>&1; then
+    hdiutil detach "$mountpoint" -force >/dev/null 2>&1 || true
+    sleep 2
+fi
 
-hdiutil convert "$rw_dmg" -format UDZO -imagekey zlib-level=9 -o "$compressed_dmg" >/dev/null
+converted=0
+for _ in 1 2 3 4 5; do
+    if hdiutil convert "$rw_dmg" -format UDZO -imagekey zlib-level=9 -o "$compressed_dmg" >/dev/null 2>&1; then
+        converted=1
+        break
+    fi
+    sleep 2
+done
+if [[ "$converted" -ne 1 ]]; then
+    echo "hdiutil convert failed" >&2
+    exit 1
+fi
 mv -f "$compressed_dmg" "$dmg_path"
 (cd "$project_root/dist" && shasum -a 256 "$dmg_name" > SHA256SUMS)
 

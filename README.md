@@ -1,5 +1,7 @@
 # FreeAPI
 
+[![macOS CI](https://github.com/hermanzhaozzzz/FreeAPI/actions/workflows/build.yml/badge.svg)](https://github.com/hermanzhaozzzz/FreeAPI/actions/workflows/build.yml)
+
 <img src="Resources/AppIcon.png" alt="FreeAPI icon" width="120">
 
 **自用项目，仅供别人参考。** 按作者自己的使用习惯维护，其他环境需要自行调整；不承诺通用兼容性或长期支持。
