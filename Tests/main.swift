@@ -201,6 +201,21 @@ do {
     check(false, "iCloud 保存测试失败：\(error.localizedDescription)")
 }
 
+do {
+    var newerBackend = syncSeed
+    newerBackend.name = "本机更新"
+    try syncEncoder.encode(AppConfiguration(backends: [newerBackend]))
+        .write(to: URL(fileURLWithPath: syncLocalDir + "/config.json"))
+    try syncFileManager.setAttributes(
+        [.modificationDate: Date().addingTimeInterval(10)],
+        ofItemAtPath: syncLocalDir + "/config.json"
+    )
+    let loaded = try ConfigurationStore.load()
+    check(loaded.configuration.backends.first?.name == "本机更新", "较新的本机配置覆盖旧 iCloud 副本")
+} catch {
+    check(false, "较新本机配置迁移失败：\(error.localizedDescription)")
+}
+
 try? syncFileManager.removeItem(atPath: syncTestRoot)
 
 if failures > 0 {

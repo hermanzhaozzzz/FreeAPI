@@ -114,10 +114,16 @@ enum ConfigurationStore {
         guard ConfigLocation.isUsingICloud else { return }
         let manager = FileManager.default
         let target = fileURL
-        guard !manager.fileExists(atPath: target.path) else { return }
-
         let source = ConfigLocation.defaultDirectory.appendingPathComponent("config.json")
         guard manager.fileExists(atPath: source.path) else { return }
+
+        if manager.fileExists(atPath: target.path) {
+            guard let sourceDate = modificationDate(source),
+                  let targetDate = modificationDate(target),
+                  sourceDate > targetDate else {
+                return
+            }
+        }
 
         do {
             try manager.createDirectory(at: directoryURL, withIntermediateDirectories: true)
@@ -127,6 +133,11 @@ enum ConfigurationStore {
         } catch {
             ConfigLocation.fallbackToLocalForLaunch(reason: "无法写入 iCloud 配置，已临时使用本机配置")
         }
+    }
+
+    private static func modificationDate(_ url: URL) -> Date? {
+        let attributes = try? FileManager.default.attributesOfItem(atPath: url.path)
+        return attributes?[.modificationDate] as? Date
     }
 
     private static func backupLegacy(_ data: Data) throws {
