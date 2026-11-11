@@ -216,6 +216,45 @@ do {
     check(false, "较新本机配置迁移失败：\(error.localizedDescription)")
 }
 
+// MARK: - config diff / backups
+
+var diffOld = AppConfiguration(backends: [syncSeed])
+var diffNew = diffOld
+diffNew.backends[0].host = "new.example.com"
+check(ConfigurationDiff.summary(from: diffOld, to: diffNew).contains("服务器地址"), "备份摘要记录字段改动")
+
+var added = diffNew
+var extraBackend = syncSeed
+extraBackend.id = UUID()
+extraBackend.name = "新加入"
+added.backends.append(extraBackend)
+check(ConfigurationDiff.summary(from: diffNew, to: added).contains("添加"), "备份摘要记录添加后端")
+
+var removed = diffOld
+removed.backends.removeAll()
+check(ConfigurationDiff.summary(from: diffOld, to: removed).contains("删除"), "备份摘要记录删除后端")
+
+var enabled = diffOld
+enabled.backends[0].enabled = true
+check(ConfigurationDiff.summary(from: diffOld, to: enabled).contains("启用"), "备份摘要记录启用")
+
+var single = diffOld
+single.mode = .single
+check(ConfigurationDiff.summary(from: diffOld, to: single).contains("单路"), "备份摘要记录模式")
+
+try? syncFileManager.removeItem(at: ConfigBackupStore.directoryURL)
+for index in 0..<25 {
+    var backend = syncSeed
+    backend.name = "备份\(index)"
+    ConfigBackupStore.add(configuration: AppConfiguration(backends: [backend]), summary: "修改名称")
+}
+let storedBackups = ConfigBackupStore.load()
+check(storedBackups.count == ConfigBackupStore.maxBackups, "备份数量限制为 20")
+check(storedBackups.first?.configuration.backends.first?.name == "备份24", "最新备份在最前")
+let countBeforeDuplicate = storedBackups.count
+ConfigBackupStore.add(configuration: storedBackups[0].configuration, summary: "重复")
+check(ConfigBackupStore.load().count == countBeforeDuplicate, "相同配置不重复备份")
+
 try? syncFileManager.removeItem(atPath: syncTestRoot)
 
 if failures > 0 {

@@ -1,18 +1,39 @@
-name: macOS build
+name: macOS CI
+
 on:
   push:
+    branches: [main]
+    tags: ["v*"]
   pull_request:
   workflow_dispatch:
+
 permissions:
   contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
-  build:
+  checks:
     runs-on: macos-15
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
-      - name: Test configuration and lifecycle
+      - name: Ensure shellcheck
+        run: command -v shellcheck >/dev/null || brew install shellcheck
+      - name: Project checks
+        run: ./scripts/check.sh
+      - name: Project tests
         run: ./scripts/test.sh
-      - name: Build universal app
+
+  build:
+    needs: checks
+    runs-on: macos-15
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build universal app and DMG
         run: ./scripts/package.sh universal
       - uses: actions/upload-artifact@v4
         with:
@@ -20,3 +41,4 @@ jobs:
           path: |
             dist/FreeAPI-*.dmg
             dist/SHA256SUMS
+          if-no-files-found: error

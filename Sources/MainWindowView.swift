@@ -3,12 +3,13 @@ import AppKit
 
 struct MainWindowView: View {
     @ObservedObject var model: AppModel
+    @State private var showSettings = ProcessInfo.processInfo.environment["FREEAPI_SHOW_SETTINGS"] == "1"
 
     var body: some View {
         ZStack {
             AuroraBackground()
             HStack(spacing: 0) {
-                SidebarView(model: model)
+                SidebarView(model: model, openSettings: { showSettings = true })
                     .frame(width: 300)
                 Rectangle()
                     .fill(Color.hairline)
@@ -24,12 +25,16 @@ struct MainWindowView: View {
         }
         .animation(.easeInOut(duration: 0.2), value: model.toast)
         .frame(minWidth: 920, minHeight: 640)
+        .sheet(isPresented: $showSettings) {
+            SettingsView(model: model)
+        }
         .ignoresSafeArea(.container, edges: .top)
     }
 }
 
 private struct SidebarView: View {
     @ObservedObject var model: AppModel
+    let openSettings: () -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -171,7 +176,7 @@ private struct SidebarView: View {
                 .frame(height: 1)
             HStack(spacing: 6) {
                 Button {
-                    model.addBackend()
+                    openSettings()
                 } label: {
                     HStack(spacing: 5) {
                         Image(systemName: "plus")
@@ -181,33 +186,7 @@ private struct SidebarView: View {
                 }
                 .buttonStyle(SecondaryButtonStyle())
 
-                Menu {
-                    Text("配置位置：\(model.configLocationLabel)")
-                    if !model.isUsingICloudConfig {
-                        Button("使用 iCloud Drive") {
-                            model.useICloudLocation()
-                        }
-                    }
-                    if !model.isUsingLocalConfig {
-                        Button("使用本机默认位置") {
-                            model.useLocalLocation()
-                        }
-                    }
-                    Button("选择其它文件夹…") {
-                        model.chooseConfigFolder()
-                    }
-                    Divider()
-                    Button("重新载入配置") {
-                        model.reloadConfiguration()
-                    }
-                    Button("打开配置文件夹") {
-                        ConfigurationStore.revealInFinder()
-                    }
-                    Divider()
-                    Button("关于 FreeAPI") {
-                        NSApp.orderFrontStandardAboutPanel(nil)
-                    }
-                } label: {
+                Button(action: openSettings) {
                     Image(systemName: "gearshape")
                         .font(.system(size: 12, weight: .medium))
                         .foregroundStyle(Color.ink2)
@@ -221,9 +200,8 @@ private struct SidebarView: View {
                                 .strokeBorder(Color.hairline, lineWidth: 0.8)
                         )
                 }
-                .menuStyle(.borderlessButton)
-                .menuIndicator(.hidden)
-                .fixedSize()
+                .buttonStyle(.plain)
+                .help("高级设置与后端管理")
             }
         }
         .padding(.top, 8)
@@ -314,7 +292,6 @@ private struct DetailContent: View {
     let backend: Backend
 
     @State private var revealKey = false
-    @State private var confirmDelete = false
 
     private var state: ConnectionState { model.state(for: backend) }
     private var runtime: BackendRuntime { model.runtime(for: backend.id) }
@@ -341,14 +318,6 @@ private struct DetailContent: View {
                 .padding(.bottom, 16)
             }
             footer
-        }
-        .alert("删除“\(backend.name)”？", isPresented: $confirmDelete) {
-            Button("删除", role: .destructive) {
-                model.deleteBackend(backend.id)
-            }
-            Button("取消", role: .cancel) {}
-        } message: {
-            Text("本机配置和钥匙串中的 API Key 会一起删除。")
         }
     }
 
@@ -387,28 +356,6 @@ private struct DetailContent: View {
                     .toggleStyle(.switch)
                     .controlSize(.regular)
                     .tint(Color.ok)
-
-                Menu {
-                    Button("删除此后端", role: .destructive) {
-                        confirmDelete = true
-                    }
-                } label: {
-                    Image(systemName: "ellipsis")
-                        .font(.system(size: 13, weight: .medium))
-                        .foregroundStyle(Color.ink2)
-                        .frame(width: 28, height: 28)
-                        .background(
-                            RoundedRectangle(cornerRadius: 8, style: .continuous)
-                                .fill(Color.fieldFill)
-                        )
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 8, style: .continuous)
-                                .strokeBorder(Color.hairline, lineWidth: 0.8)
-                        )
-                }
-                .menuStyle(.borderlessButton)
-                .menuIndicator(.hidden)
-                .fixedSize()
             }
             .padding(.top, 5)
         }
@@ -873,15 +820,27 @@ private struct EmptyDetailView: View {
                     .multilineTextAlignment(.center)
                     .frame(maxWidth: 360)
             }
-            Button {
-                model.addBackend()
-            } label: {
-                HStack(spacing: 6) {
-                    Image(systemName: "plus")
-                    Text("添加后端")
+            HStack(spacing: 8) {
+                Button {
+                    model.addBackend(transport: .ssh)
+                } label: {
+                    HStack(spacing: 5) {
+                        Image(systemName: "plus")
+                        Text("SSH 后端")
+                    }
                 }
+                .buttonStyle(PrimaryButtonStyle())
+
+                Button {
+                    model.addBackend(transport: .direct)
+                } label: {
+                    HStack(spacing: 5) {
+                        Image(systemName: "globe")
+                        Text("直连后端")
+                    }
+                }
+                .buttonStyle(SecondaryButtonStyle())
             }
-            .buttonStyle(PrimaryButtonStyle())
             .padding(.top, 4)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)

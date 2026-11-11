@@ -15,6 +15,7 @@ final class AppModel: ObservableObject {
     @Published private(set) var isShuttingDown = false
     @Published private(set) var didMigrate = false
     @Published private(set) var configLocationWarning: String?
+    @Published private(set) var backups: [ConfigBackup] = []
 
     var onOpenWindow: ((UUID?) -> Void)?
 
@@ -73,6 +74,7 @@ final class AppModel: ObservableObject {
         }
         lastKnownConfigData = ConfigurationStore.currentData()
         configLocationWarning = ConfigLocation.fallbackWarning
+        backups = ConfigBackupStore.load()
     }
 
     // MARK: - Lifecycle
@@ -371,25 +373,41 @@ final class AppModel: ObservableObject {
         }
     }
 
-    func addBackend() {
+    func addBackend(transport: BackendTransport = .ssh) {
         let used = Set(configuration.backends.compactMap(\.localPort))
-        let port = PortChecker.nextAvailable(startingAt: 18189, excluding: used)
-        let backend = Backend(
-            name: "新后端 \(configuration.backends.count + 1)",
-            transport: .ssh,
-            scheme: "http",
-            host: "",
-            port: 8080,
-            apiPath: "/v1",
-            localPort: port,
-            sshTarget: "",
-            enabled: false
-        )
+        let name = "新后端 \(configuration.backends.count + 1)"
+        let backend: Backend
+        switch transport {
+        case .ssh:
+            backend = Backend(
+                name: name,
+                transport: .ssh,
+                scheme: "http",
+                host: "",
+                port: 8080,
+                apiPath: "/v1",
+                localPort: PortChecker.nextAvailable(startingAt: 18189, excluding: used),
+                sshTarget: "",
+                enabled: false
+            )
+        case .direct:
+            backend = Backend(
+                name: name,
+                transport: .direct,
+                scheme: "https",
+                host: "",
+                port: 443,
+                apiPath: "/v1",
+                localPort: nil,
+                sshTarget: "",
+                enabled: false
+            )
+        }
         configuration.backends.append(backend)
         selectedID = backend.id
         runtimes[backend.id] = BackendRuntime()
         scheduleSave()
-        showToast("已添加后端，填写地址后启用")
+        showToast(transport == .ssh ? "已添加 SSH 后端，填写地址后启用" : "已添加直连后端，填写地址后启用")
     }
 
     func deleteBackend(_ id: UUID) {
@@ -560,10 +578,20 @@ final class AppModel: ObservableObject {
         }
     }
 
-    private func persistNow() throws {
+    private func persistNow(summaryOverride: String? = nil) throws {
         let sanitized = configuration.sanitized()
         configuration = sanitized
+
+        let previousData = ConfigurationStore.currentData()
+        let previousConfiguration = previousData.flatMap { try? ConfigurationStore.decode($0) }
+        if previousConfiguration == sanitized {
+            lastKnownConfigData = previousData
+            return
+        }
+
+        let summary = summaryOverride ?? ConfigurationDiff.summary(from: previousConfiguration, to: sanitized)
         let data = try ConfigurationStore.save(sanitized)
+        backups = ConfigBackupStore.add(configuration: sanitized, summary: summary)
         lastKnownConfigData = data
     }
 
@@ -574,6 +602,37 @@ final class AppModel: ObservableObject {
             showToast("保存失败：\(error.localizedDescription)")
         }
     }
+
+    var lastBackupText: String {
+        backups.first.map { backupTimeText($0.createdAt) } ?? "暂无"
+    }
+
+    func backupTimeText(_ date: Date) -> String {
+        Self.backupDateFormatter.string(from: date)
+    }
+
+    func restoreBackup(_ backup: ConfigBackup) {
+        do {
+            try persistNow()
+        } catch {
+            showToast("保存当前配置失败：\(error.localizedDescription)")
+            return
+        }
+        applyLoadedConfiguration(backup.configuration)
+        do {
+            try persistNow(summaryOverride: "恢复到 \(backupTimeText(backup.createdAt)) 的配置")
+            showToast("已恢复到 \(backupTimeText(backup.createdAt)) 的配置")
+        } catch {
+            showToast("恢复保存失败：\(error.localizedDescription)")
+        }
+    }
+
+    private static let backupDateFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "zh_CN")
+        formatter.dateFormat = "M月d日 HH:mm"
+        return formatter
+    }()
 
     private func flushKeys() {
         for (id, value) in apiKeys {
@@ -781,7 +840,7 @@ final class AppModel: ObservableObject {
             self?.saveNow()
         }
         saveTask = work
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.4, execute: work)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5, execute: work)
     }
 
     // MARK: - Health checks
