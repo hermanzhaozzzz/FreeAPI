@@ -161,10 +161,14 @@ Claude Code / Claude Desktop 使用 Anthropic 协议；如果上游只有 OpenAI
 
 [`integrations/hermes/`](integrations/hermes/) 保存了作者使用 FreeAPI + DeepSeek 时遇到的重复思考字段问题的临时补丁。它单独安装，不随应用自动启用；作用范围和卸载方式见该目录说明。
 
+## 文章
+
+- [DeepSeek v4.1 Flash 部署在内网，怎么拿到本机用？](articles/freeapi-zhihu.md)：面向普通读者的 FreeAPI 3.0 介绍，含配图和知乎发布版式。另有[渲染版 HTML](articles/freeapi-zhihu.html) 和[图片与 Markdown 打包](articles/freeapi-zhihu-assets.zip)。
+
 ## 卸载
 
 从菜单选择「退出并关闭隧道」，然后把 FreeAPI 从应用程序文件夹拖到废纸篓。iCloud Drive 中的 `FreeAPI` 文件夹、本机配置目录 `~/Library/Application Support/FreeAPI`、钥匙串中的 `local.freeapi.apikey` 条目和下载的 DMG 可按需删除。没有系统后台服务需要卸载。Hermes 插件需按其独立说明移除。
 
 ## 仓库边界
 
-本仓库包含应用源码、生成的应用图标、构建脚本、脱敏配置示例、视觉稿及可选兼容补丁。真实地址、SSH 密钥、API Key、运行日志和会话数据保留在本机。不要将自己的配置或客户端数据库提交到仓库。
+本仓库包含应用源码、生成的应用图标、构建脚本、脱敏配置示例、视觉稿、文章及可选兼容补丁。真实地址、SSH 密钥、API Key、运行日志和会话数据保留在本机。不要将自己的配置或客户端数据库提交到仓库。
