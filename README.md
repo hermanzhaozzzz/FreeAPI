@@ -121,6 +121,8 @@ xcode-select --install    # 已安装则跳过
 
 GitHub Actions 在 macOS 15 上运行 shellcheck、plist/JSON、Swift typecheck、配置/迁移和 guardian 清理测试，并构建 Universal 应用和 DMG。CI 不连接任何真实跳板机，也不需要密钥。
 
+版本号规则、tag 和 GitHub Release 的发布与维护流程见 [`AGENTS.md`](AGENTS.md)。
+
 ## 开发检查
 
 需要 Xcode Command Line Tools、shellcheck 和 prek（`brew install prek`）。提交前检查：
