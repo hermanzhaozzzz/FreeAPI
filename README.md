@@ -117,7 +117,7 @@ xcode-select --install    # 已安装则跳过
 ./scripts/package.sh arm64
 ```
 
-产物为 `build/FreeAPI.app` 和拖拽安装的 `dist/FreeAPI-3.0.0.dmg`。打开 DMG，把 FreeAPI 拖到 Applications，然后从应用程序文件夹启动。构建使用 ad-hoc 签名，未进行 Apple 公证。运行验证以作者的 Intel / macOS 15 环境为主；Apple Silicon 版本需要自行验证。
+产物为 `build/FreeAPI.app` 和拖拽安装的 `dist/FreeAPI-3.1.0.dmg`。打开 DMG，把 FreeAPI 拖到 Applications，然后从应用程序文件夹启动。构建使用 ad-hoc 签名，未进行 Apple 公证。运行验证以作者的 Intel / macOS 15 环境为主；Apple Silicon 版本需要自行验证。
 
 GitHub Actions 在 macOS 15 上运行 shellcheck、plist/JSON、Swift typecheck、配置/迁移和 guardian 清理测试，并构建 Universal 应用和 DMG。CI 不连接任何真实跳板机，也不需要密钥。
 
