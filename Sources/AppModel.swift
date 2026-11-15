@@ -16,6 +16,8 @@ final class AppModel: ObservableObject {
     @Published private(set) var startupError: String?
     @Published private(set) var isShuttingDown = false
     @Published private(set) var didMigrate = false
+    @Published private(set) var launchAtLoginEnabled = LaunchAtLogin.state != .off
+    @Published private(set) var launchAtLoginAwaitingApproval = LaunchAtLogin.state == .awaitingApproval
     @Published private(set) var configLocationWarning: String?
     @Published private(set) var backups: [ConfigBackup] = []
 
@@ -310,6 +312,31 @@ final class AppModel: ObservableObject {
     }
 
     // MARK: - Commands
+
+    func refreshLaunchAtLogin() {
+        let state = LaunchAtLogin.state
+        launchAtLoginEnabled = state != .off
+        launchAtLoginAwaitingApproval = state == .awaitingApproval
+    }
+
+    func setLaunchAtLogin(_ enabled: Bool) {
+        do {
+            try LaunchAtLogin.setEnabled(enabled)
+            refreshLaunchAtLogin()
+            if launchAtLoginAwaitingApproval {
+                showToast("已在系统设置中登记登录项，请允许后生效")
+            } else {
+                showToast(enabled ? "已设置登录时启动" : "已关闭登录时启动")
+            }
+        } catch {
+            refreshLaunchAtLogin()
+            showToast("设置登录时启动失败：\(error.localizedDescription)")
+        }
+    }
+
+    func openLoginItemsSettings() {
+        LaunchAtLogin.openSystemSettings()
+    }
 
     func setMode(_ mode: RunMode) {
         guard mode != configuration.mode else { return }

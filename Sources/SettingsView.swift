@@ -11,6 +11,7 @@ struct SettingsView: View {
             header
             ScrollView {
                 VStack(alignment: .leading, spacing: 18) {
+                    startupSection
                     storageSection
                     backupsSection
                     modeSection
@@ -26,6 +27,9 @@ struct SettingsView: View {
                 .padding(.bottom, 58)
         }
         .animation(.easeInOut(duration: 0.2), value: model.toast)
+        .onAppear {
+            model.refreshLaunchAtLogin()
+        }
         .alert(item: $pendingRestore) { backup in
             Alert(
                 title: Text("恢复这份备份？"),
@@ -44,7 +48,7 @@ struct SettingsView: View {
                 Text("设置")
                     .font(Typography.display(20))
                     .foregroundStyle(Color.ink)
-                Text("配置存储、备份和运行模式这些不常改的选项放在这里。")
+                Text("启动、配置存储、备份和运行模式这些不常改的选项放在这里。")
                     .font(.system(size: 10.5))
                     .foregroundStyle(Color.ink3)
             }
@@ -61,6 +65,52 @@ struct SettingsView: View {
         .padding(.horizontal, 22)
         .padding(.top, 20)
         .padding(.bottom, 10)
+    }
+
+    private var startupSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text("启动")
+                    .font(.system(size: 12.5, weight: .semibold))
+                    .foregroundStyle(Color.ink)
+                Text("登录这台 Mac 后自动在菜单栏运行，并按当前配置连接已启用的后端。")
+                    .font(.system(size: 10.5))
+                    .foregroundStyle(Color.ink3)
+            }
+
+            GlassCard(cornerRadius: 12, padding: 14) {
+                VStack(alignment: .leading, spacing: 10) {
+                    HStack(spacing: 12) {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("登录时启动 FreeAPI")
+                                .font(.system(size: 12, weight: .semibold))
+                                .foregroundStyle(Color.ink)
+                            Text(model.launchAtLoginAwaitingApproval
+                                 ? "已在系统设置登记，需要允许后才会生效。"
+                                 : "只驻留菜单栏，不自动打开主窗口。")
+                                .font(.system(size: 9.5))
+                                .foregroundStyle(Color.ink3)
+                        }
+                        Spacer()
+                        Toggle("", isOn: Binding(
+                            get: { model.launchAtLoginEnabled },
+                            set: { model.setLaunchAtLogin($0) }
+                        ))
+                        .labelsHidden()
+                        .toggleStyle(.switch)
+                        .controlSize(.small)
+                        .tint(Color.ok)
+                    }
+
+                    if model.launchAtLoginAwaitingApproval {
+                        Button("打开登录项设置") {
+                            model.openLoginItemsSettings()
+                        }
+                        .buttonStyle(SecondaryButtonStyle())
+                    }
+                }
+            }
+        }
     }
 
     private var storageSection: some View {
